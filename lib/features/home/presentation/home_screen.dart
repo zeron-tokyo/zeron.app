@@ -35,6 +35,20 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     'the air feels heavier',
   ];
 
+  final List<String> _memoryStillPool = const [
+    'it stayed quiet with you',
+    'it remembers your stillness',
+    'the silence gathered around you',
+    'you let the room settle',
+  ];
+
+  final List<String> _memoryActivePool = const [
+    'it remembers being touched',
+    'you changed the room first',
+    'it reacted to your movement',
+    'the space learned your motion',
+  ];
+
   Offset? _pointerPosition;
 
   Duration _presence = Duration.zero;
@@ -43,13 +57,18 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   Timer? _messageHideTimer;
   Timer? _ambientShiftTimer;
   Timer? _ambientEventTimer;
+  Timer? _interactionDecayTimer;
 
   bool _isIdle = false;
   String? _currentMessage;
 
+  int _interactionCount = 0;
+  double _interactionEnergy = 0.0;
+
   bool _event20Shown = false;
   bool _event45Shown = false;
   bool _event90Shown = false;
+  bool _memoryEventShown = false;
 
   int _ambientShiftStage = 0;
   Offset _ambientDriftOffset = Offset.zero;
@@ -63,6 +82,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     _startPresenceTimer();
     _startAmbientShiftTimer();
     _scheduleNextAmbientEvent();
+    _startInteractionDecay();
     _resetIdleTimer();
   }
 
@@ -73,6 +93,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     _messageHideTimer?.cancel();
     _ambientShiftTimer?.cancel();
     _ambientEventTimer?.cancel();
+    _interactionDecayTimer?.cancel();
     super.dispose();
   }
 
@@ -101,6 +122,11 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
         _showPresenceMessage();
       }
 
+      if (seconds >= 150 && !_memoryEventShown) {
+        _memoryEventShown = true;
+        _showMemoryReactionMessage();
+      }
+
       _syncAmbientShiftStage();
     });
   }
@@ -110,6 +136,20 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
       if (!mounted) return;
       if (_ambientShiftStage == 0) return;
       _applyAmbientShift();
+    });
+  }
+
+  void _startInteractionDecay() {
+    _interactionDecayTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_interactionEnergy <= 0) return;
+
+      setState(() {
+        _interactionEnergy -= 0.015;
+        if (_interactionEnergy < 0) {
+          _interactionEnergy = 0;
+        }
+      });
     });
   }
 
@@ -173,9 +213,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     }
 
     final maxDrift = switch (stage) {
-      1 => 8.0,
-      2 => 16.0,
-      _ => 24.0,
+      1 => 8.0 + (_interactionEnergy * 6),
+      2 => 16.0 + (_interactionEnergy * 10),
+      _ => 24.0 + (_interactionEnergy * 14),
     };
 
     final veilBase = switch (stage) {
@@ -228,7 +268,14 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   void _handlePointerEvent(PointerEvent event) {
     setState(() {
       _pointerPosition = event.localPosition;
+      _interactionCount++;
+
+      _interactionEnergy += 0.04;
+      if (_interactionEnergy > 1.0) {
+        _interactionEnergy = 1.0;
+      }
     });
+
     _resetIdleTimer();
   }
 
@@ -248,6 +295,28 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
         exclude: _currentMessage,
       ),
     );
+  }
+
+  void _showMemoryReactionMessage() {
+    final pool = _selectMemoryReactionPool();
+
+    _showMessage(
+      _pickRandomMessage(
+        pool: pool,
+        exclude: _currentMessage,
+      ),
+    );
+  }
+
+  List<String> _selectMemoryReactionPool() {
+    final stayedLong = _presence.inSeconds >= 150;
+    final wasActive = _interactionCount >= 18 || _interactionEnergy >= 0.45;
+
+    if (stayedLong && wasActive) {
+      return _memoryActivePool;
+    }
+
+    return _memoryStillPool;
   }
 
   void _showMessage(String message) {
