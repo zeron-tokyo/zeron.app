@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zeron/widgets/zeron_background.dart';
 import 'package:zeron/widgets/zeron_distortion.dart';
 import 'package:zeron/widgets/zeron_glow.dart';
@@ -18,9 +20,18 @@ class ZeronHomeScreen extends StatefulWidget {
 class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   static const Duration _tickRate = Duration(milliseconds: 100);
 
+  static const String _keyTotalSessions = 'zeron_total_sessions';
+  static const String _keyTotalPresenceSeconds = 'zeron_total_presence_seconds';
+  static const String _keyLastSessionType = 'zeron_last_session_type';
+  static const String _keyMemoryImprint = 'zeron_memory_imprint';
+  static const String _keyLastVisitAt = 'zeron_last_visit_at';
+  static const String _keyMaxAmbientStage = 'zeron_max_ambient_stage';
+
   final Random _random = Random();
 
   Timer? _ticker;
+  SharedPreferences? _prefs;
+
   Duration _presence = Duration.zero;
 
   int _ambientStage = 0;
@@ -31,6 +42,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
 
   bool _isPointerInside = false;
   bool _isIdle = false;
+  bool _isMemoryLoaded = false;
+  bool _hasSavedSessionSummary = false;
+  bool _hasTriggeredPersistentMemory = false;
 
   Offset _pointerPosition = Offset.zero;
   Offset _pointerTarget = Offset.zero;
@@ -47,17 +61,87 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   bool _hasShown90s = false;
   bool _hasShown150s = false;
 
+  int _storedTotalSessions = 0;
+  int _storedTotalPresenceSeconds = 0;
+  int _storedMaxAmbientStage = 0;
+  String _storedLastSessionType = 'none';
+  String _storedMemoryImprint = 'none';
+  String _storedLastVisitAt = '';
+
   @override
   void initState() {
     super.initState();
     _scheduleNextAmbientEvent();
+    _loadMemoryLayer();
     _ticker = Timer.periodic(_tickRate, _onTick);
   }
 
   @override
   void dispose() {
+    _saveSessionSummary();
     _ticker?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadMemoryLayer() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    final int totalSessions = prefs.getInt(_keyTotalSessions) ?? 0;
+    final int totalPresenceSeconds =
+        prefs.getInt(_keyTotalPresenceSeconds) ?? 0;
+    final int maxAmbientStage = prefs.getInt(_keyMaxAmbientStage) ?? 0;
+    final String lastSessionType =
+        prefs.getString(_keyLastSessionType) ?? 'none';
+    final String memoryImprint = prefs.getString(_keyMemoryImprint) ?? 'none';
+    final String lastVisitAt = prefs.getString(_keyLastVisitAt) ?? '';
+
+    await prefs.setInt(_keyTotalSessions, totalSessions + 1);
+    await prefs.setString(
+      _keyLastVisitAt,
+      DateTime.now().toIso8601String(),
+    );
+
+    _prefs = prefs;
+
+    if (!mounted) return;
+
+    setState(() {
+      _storedTotalSessions = totalSessions;
+      _storedTotalPresenceSeconds = totalPresenceSeconds;
+      _storedMaxAmbientStage = maxAmbientStage;
+      _storedLastSessionType = lastSessionType;
+      _storedMemoryImprint = memoryImprint;
+      _storedLastVisitAt = lastVisitAt;
+      _isMemoryLoaded = true;
+    });
+
+    _showInitialMemoryHintIfNeeded();
+  }
+
+  void _showInitialMemoryHintIfNeeded() {
+    if (!_isMemoryLoaded) return;
+    if (_storedTotalSessions <= 0) return;
+
+    String message;
+
+    if (_storedMemoryImprint == 'active') {
+      message = 'it remembers your movement';
+    } else if (_storedMemoryImprint == 'still') {
+      message = 'it remembers your stillness';
+    } else if (_storedTotalSessions >= 3) {
+      message = 'you have been here before';
+    } else {
+      message = 'this place feels familiar';
+    }
+
+    _presenceMessage = message;
+    _presenceMessageUntil = DateTime.now().add(
+      const Duration(milliseconds: 2600),
+    );
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _onTick(Timer timer) {
@@ -67,19 +151,18 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
 
     _presence += _tickRate;
 
-    final double nextEnergy = (_interactionEnergy - (0.015 * deltaSeconds))
+    _interactionEnergy = (_interactionEnergy - (0.015 * deltaSeconds))
         .clamp(0.0, 1.0);
-    _interactionEnergy = nextEnergy;
 
-    _pointerPosition = Offset.lerp(_pointerPosition, _pointerTarget, 0.08) ??
-        _pointerPosition;
+    _pointerPosition =
+        Offset.lerp(_pointerPosition, _pointerTarget, 0.08) ?? _pointerPosition;
 
     _updateAmbientStage();
     _handlePresenceMilestones();
     _handleAmbientEvent();
+    _handlePersistentMemoryMoment();
 
-    final bool shouldIdle = _interactionEnergy < 0.02 && _presence.inSeconds > 6;
-    _isIdle = shouldIdle;
+    _isIdle = _interactionEnergy < 0.02 && _presence.inSeconds > 6;
 
     if (_presenceMessageUntil != null &&
         DateTime.now().isAfter(_presenceMessageUntil!)) {
@@ -115,40 +198,86 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
 
     if (!_hasShown20s && seconds >= 20) {
       _hasShown20s = true;
-      _showPresenceMessage('it noticed you');
+      _showPresenceMessage(
+        _storedTotalSessions > 0 ? 'it noticed you again' : 'it noticed you',
+      );
       return;
     }
 
     if (!_hasShown45s && seconds >= 45) {
       _hasShown45s = true;
-      _showPresenceMessage('you have been here for a while');
+      _showPresenceMessage(
+        _storedMemoryImprint == 'active'
+            ? 'it expects movement from you'
+            : 'you have been here for a while',
+      );
       return;
     }
 
     if (!_hasShown90s && seconds >= 90) {
       _hasShown90s = true;
-      _showPresenceMessage(
-        _interactionCount >= 12 ? 'it reacts when you move' : 'it waits with you',
-      );
+      _showPresenceMessage(_build90sMessage());
       return;
     }
 
     if (!_hasShown150s && seconds >= 150) {
       _hasShown150s = true;
       _showPresenceMessage(_buildMemoryReactionMessage());
+      _savePersistentMemoryReaction();
       return;
     }
+  }
+
+  String _build90sMessage() {
+    if (_storedMemoryImprint == 'active' && _interactionCount >= 8) {
+      return 'it responds faster this time';
+    }
+
+    if (_storedMemoryImprint == 'still' && _interactionCount < 8) {
+      return 'it settles into your silence';
+    }
+
+    if (_interactionCount >= 12) {
+      return 'it reacts when you move';
+    }
+
+    return 'it waits with you';
   }
 
   String _buildMemoryReactionMessage() {
     final bool activeReaction =
         _interactionCount >= 18 || _peakInteractionEnergy >= 0.35;
 
+    if (_storedTotalSessions > 0) {
+      if (activeReaction) {
+        return 'it remembers how you move through it';
+      }
+      return 'it remembers how quietly you stayed';
+    }
+
     if (activeReaction) {
       return 'it remembers how you touched the room';
     }
 
     return 'it remembers how still you were';
+  }
+
+  void _handlePersistentMemoryMoment() {
+    if (_hasTriggeredPersistentMemory) return;
+    if (!_isMemoryLoaded) return;
+    if (_presence.inSeconds < 110) return;
+    if (_storedTotalSessions <= 0) return;
+
+    if (_storedMemoryImprint == 'active' && _interactionEnergy > 0.12) {
+      _hasTriggeredPersistentMemory = true;
+      _showPresenceMessage('it falls back into your old rhythm');
+      return;
+    }
+
+    if (_storedMemoryImprint == 'still' && _interactionCount < 6) {
+      _hasTriggeredPersistentMemory = true;
+      _showPresenceMessage('it recognizes your quiet');
+    }
   }
 
   void _handleAmbientEvent() {
@@ -162,6 +291,10 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
         'something shifted',
         'the room leaned closer',
       ];
+
+      if (_storedTotalSessions > 1) {
+        events.add('it feels familiar now');
+      }
 
       _ambientEventMessage = events[_random.nextInt(events.length)];
       _ambientEventUntil = DateTime.now().add(
@@ -179,7 +312,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
 
   void _showPresenceMessage(String message) {
     _presenceMessage = message;
-    _presenceMessageUntil = DateTime.now().add(const Duration(milliseconds: 3200));
+    _presenceMessageUntil = DateTime.now().add(
+      const Duration(milliseconds: 3200),
+    );
   }
 
   void _registerInteraction(Offset localPosition, {double gain = 0.04}) {
@@ -187,6 +322,38 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     _interactionEnergy = (_interactionEnergy + gain).clamp(0.0, 1.0);
     _peakInteractionEnergy = max(_peakInteractionEnergy, _interactionEnergy);
     _pointerTarget = localPosition;
+  }
+
+  Future<void> _savePersistentMemoryReaction() async {
+    final SharedPreferences? prefs = _prefs;
+    if (prefs == null) return;
+
+    final bool activeReaction =
+        _interactionCount >= 18 || _peakInteractionEnergy >= 0.35;
+    final String sessionType = activeReaction ? 'active' : 'still';
+
+    await prefs.setString(_keyLastSessionType, sessionType);
+    await prefs.setString(_keyMemoryImprint, sessionType);
+
+    _storedLastSessionType = sessionType;
+    _storedMemoryImprint = sessionType;
+  }
+
+  Future<void> _saveSessionSummary() async {
+    if (_hasSavedSessionSummary) return;
+
+    final SharedPreferences? prefs = _prefs;
+    if (prefs == null) return;
+
+    _hasSavedSessionSummary = true;
+
+    final int previousPresence = prefs.getInt(_keyTotalPresenceSeconds) ?? 0;
+    final int newPresence = previousPresence + _presence.inSeconds;
+    final int previousMaxStage = prefs.getInt(_keyMaxAmbientStage) ?? 0;
+    final int newMaxStage = max(previousMaxStage, _ambientStage);
+
+    await prefs.setInt(_keyTotalPresenceSeconds, newPresence);
+    await prefs.setInt(_keyMaxAmbientStage, newMaxStage);
   }
 
   void _onPointerHover(PointerHoverEvent event) {
@@ -263,7 +430,10 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
               Center(
                 child: IgnorePointer(
                   child: AnimatedScale(
-                    scale: 1.0 + (_ambientStage * 0.008) + (_interactionEnergy * 0.02),
+                    scale: 1.0 +
+                        (_ambientStage * 0.008) +
+                        (_interactionEnergy * 0.02) +
+                        (_storedTotalSessions > 0 ? 0.004 : 0.0),
                     duration: const Duration(milliseconds: 700),
                     curve: Curves.easeOutCubic,
                     child: const ZeronLogo(),
@@ -283,6 +453,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
                   interactionEnergy: _interactionEnergy,
                   presenceSeconds: _presence.inMilliseconds / 1000.0,
                   isIdle: _isIdle,
+                  memoryBoost: _storedTotalSessions > 0 ? 0.03 : 0.0,
                 ),
               ),
             ],
@@ -326,7 +497,8 @@ class _PresenceMessage extends StatelessWidget {
               duration: const Duration(milliseconds: 500),
               curve: Curves.easeOut,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.03),
                   borderRadius: BorderRadius.circular(999),
@@ -359,19 +531,22 @@ class _BottomGradient extends StatelessWidget {
     required this.interactionEnergy,
     required this.presenceSeconds,
     required this.isIdle,
+    required this.memoryBoost,
   });
 
   final int stage;
   final double interactionEnergy;
   final double presenceSeconds;
   final bool isIdle;
+  final double memoryBoost;
 
   @override
   Widget build(BuildContext context) {
     final double intensity = (0.14 +
         (stage * 0.07) +
         (interactionEnergy * 0.28) +
-        (isIdle ? 0.04 : 0.0))
+        (isIdle ? 0.04 : 0.0) +
+        memoryBoost)
         .clamp(0.0, 0.6);
 
     final double height = 220 + (stage * 30) + (interactionEnergy * 80);
