@@ -1,186 +1,185 @@
 import 'dart:math';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-class ZeronBackground extends StatefulWidget {
+class ZeronBackground extends StatelessWidget {
   const ZeronBackground({
     super.key,
-    this.pointerPosition,
+    required this.presenceSeconds,
+    required this.ambientStage,
+    required this.interactionEnergy,
+    required this.pointerPosition,
   });
 
-  final Offset? pointerPosition;
-
-  @override
-  State<ZeronBackground> createState() => _ZeronBackgroundState();
-}
-
-class _ZeronBackgroundState extends State<ZeronBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final List<_Particle> _particles;
-  final Random _random = Random();
-
-  double _globalPhase = 0.0;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _particles = List.generate(70, (_) => _createParticle());
-
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 12),
-    )
-      ..addListener(_tick)
-      ..repeat();
-  }
-
-  _Particle _createParticle() {
-    final depth = _random.nextDouble();
-
-    return _Particle(
-      x: _random.nextDouble(),
-      y: _random.nextDouble(),
-      radius: lerpDouble(0.8, 2.2, depth)!,
-      opacity: lerpDouble(0.18, 0.55, depth)!,
-      speed: lerpDouble(0.00008, 0.00045, depth)!,
-      drift: lerpDouble(0.00002, 0.00010, depth)!,
-      seed: _random.nextDouble() * pi * 2,
-    );
-  }
-
-  void _tick() {
-    final pointer = widget.pointerPosition;
-    final screenSize = MediaQuery.of(context).size;
-
-    _globalPhase += 0.0035;
-
-    for (final particle in _particles) {
-      particle.y += particle.speed;
-
-      final localWave = sin((particle.y * 12) + particle.seed + _globalPhase);
-      final globalWave = sin(_globalPhase + (particle.seed * 0.35));
-
-      particle.x +=
-          (localWave * particle.drift) + (globalWave * particle.drift * 0.35);
-
-      if (pointer != null && screenSize.width > 0 && screenSize.height > 0) {
-        final particlePx = particle.x * screenSize.width;
-        final particlePy = particle.y * screenSize.height;
-
-        final dx = particlePx - pointer.dx;
-        final dy = particlePy - pointer.dy;
-        final distance = sqrt((dx * dx) + (dy * dy));
-
-        const influenceRadius = 140.0;
-
-        if (distance < influenceRadius && distance > 0.001) {
-          final force = (1 - (distance / influenceRadius)) * 0.0022;
-          particle.x += (dx / distance) * force;
-          particle.y += (dy / distance) * force;
-        }
-      }
-
-      if (particle.y > 1.02) {
-        particle.y = -0.02;
-        particle.x = _random.nextDouble();
-        _resetDepthValues(particle);
-      }
-
-      if (particle.x < -0.05) {
-        particle.x = 1.05;
-      } else if (particle.x > 1.05) {
-        particle.x = -0.05;
-      }
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _resetDepthValues(_Particle particle) {
-    final depth = _random.nextDouble();
-    particle.radius = lerpDouble(0.8, 2.2, depth)!;
-    particle.opacity = lerpDouble(0.18, 0.55, depth)!;
-    particle.speed = lerpDouble(0.00008, 0.00045, depth)!;
-    particle.drift = lerpDouble(0.00002, 0.00010, depth)!;
-    particle.seed = _random.nextDouble() * pi * 2;
-  }
-
-  @override
-  void dispose() {
-    _controller
-      ..removeListener(_tick)
-      ..dispose();
-    super.dispose();
-  }
+  final double presenceSeconds;
+  final int ambientStage;
+  final double interactionEnergy;
+  final Offset pointerPosition;
 
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: CustomPaint(
         size: Size.infinite,
-        painter: _ZeronBackgroundPainter(particles: _particles),
+        painter: _ZeronBackgroundPainter(
+          presenceSeconds: presenceSeconds,
+          ambientStage: ambientStage,
+          interactionEnergy: interactionEnergy,
+          pointerPosition: pointerPosition,
+        ),
       ),
     );
   }
 }
 
-class _ZeronBackgroundPainter extends CustomPainter {
-  const _ZeronBackgroundPainter({
-    required this.particles,
+class _ParticleSeed {
+  const _ParticleSeed({
+    required this.x,
+    required this.y,
+    required this.radius,
+    required this.speed,
+    required this.phase,
+    required this.depth,
   });
 
-  final List<_Particle> particles;
+  final double x;
+  final double y;
+  final double radius;
+  final double speed;
+  final double phase;
+  final double depth;
+}
+
+class _ZeronBackgroundPainter extends CustomPainter {
+  _ZeronBackgroundPainter({
+    required this.presenceSeconds,
+    required this.ambientStage,
+    required this.interactionEnergy,
+    required this.pointerPosition,
+  });
+
+  final double presenceSeconds;
+  final int ambientStage;
+  final double interactionEnergy;
+  final Offset pointerPosition;
+
+  static final List<_ParticleSeed> _particles = List<_ParticleSeed>.generate(
+    96,
+        (int index) {
+      final Random random = Random(index * 9173);
+      return _ParticleSeed(
+        x: random.nextDouble(),
+        y: random.nextDouble(),
+        radius: 0.7 + (random.nextDouble() * 2.6),
+        speed: 0.15 + (random.nextDouble() * 0.8),
+        phase: random.nextDouble() * pi * 2,
+        depth: 0.35 + (random.nextDouble() * 0.65),
+      );
+    },
+  );
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
+    final Rect rect = Offset.zero & size;
 
-    for (final particle in particles) {
-      final dx = particle.x * size.width;
-      final dy = particle.y * size.height;
+    final Paint basePaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[
+          Colors.white.withValues(alpha: 0.012 + ambientStage * 0.005),
+          Colors.transparent,
+          Colors.white.withValues(alpha: 0.02 + interactionEnergy * 0.03),
+        ],
+        stops: const <double>[0.0, 0.56, 1.0],
+      ).createShader(rect);
 
-      paint.color = Color.fromRGBO(
-        255,
-        255,
-        255,
-        particle.opacity,
-      );
+    canvas.drawRect(rect, basePaint);
 
-      canvas.drawCircle(
-        Offset(dx, dy),
-        particle.radius,
-        paint,
-      );
+    final Paint particlePaint = Paint()..style = PaintingStyle.fill;
+    final Paint trailPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final Offset pointerNormalized = Offset(
+      size.width == 0 ? 0.5 : (pointerPosition.dx / size.width).clamp(0.0, 1.0),
+      size.height == 0 ? 0.5 : (pointerPosition.dy / size.height).clamp(0.0, 1.0),
+    );
+
+    final double stageDrift = 4 + (ambientStage * 5.0);
+    final double energyDrift = interactionEnergy * 16.0;
+    final double presenceWave = sin(presenceSeconds * 0.18);
+
+    for (final _ParticleSeed particle in _particles) {
+      final double t = (presenceSeconds * particle.speed) + particle.phase;
+
+      final double baseX = particle.x * size.width;
+      final double baseY = particle.y * size.height;
+
+      final double driftX = sin(t * 0.9) * (stageDrift + (particle.depth * 8));
+      final double driftY = cos(t * 0.75) * (6 + (particle.depth * 12));
+
+      final double pointerPullX =
+          (pointerNormalized.dx - particle.x) * energyDrift * particle.depth * 8;
+      final double pointerPullY =
+          (pointerNormalized.dy - particle.y) * energyDrift * particle.depth * 8;
+
+      final double x = baseX + driftX + pointerPullX;
+      final double y = baseY + driftY + pointerPullY;
+
+      final double radius = particle.radius +
+          (ambientStage * 0.16) +
+          (interactionEnergy * 0.9 * particle.depth) +
+          (presenceWave * 0.08);
+
+      final double alpha = (0.09 +
+          (particle.depth * 0.13) +
+          (ambientStage * 0.02) +
+          (interactionEnergy * 0.08))
+          .clamp(0.0, 0.34);
+
+      particlePaint.color = Colors.white.withValues(alpha: alpha);
+      canvas.drawCircle(Offset(x, y), radius, particlePaint);
+
+      if (ambientStage >= 1 || interactionEnergy > 0.08) {
+        final double trailLength =
+            8 + (ambientStage * 4.0) + (interactionEnergy * 18.0);
+        final Offset end = Offset(
+          x - (sin(t) * trailLength),
+          y - (cos(t * 0.85) * trailLength),
+        );
+
+        trailPaint
+          ..strokeWidth = 0.6 + (particle.depth * 0.8)
+          ..color = Colors.white.withValues(alpha: alpha * 0.28);
+
+        canvas.drawLine(Offset(x, y), end, trailPaint);
+      }
     }
+
+    final Paint veilPaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment(
+          ((pointerNormalized.dx * 2) - 1) * 0.35,
+          ((pointerNormalized.dy * 2) - 1) * 0.35,
+        ),
+        radius: 1.1 + (ambientStage * 0.08),
+        colors: <Color>[
+          Colors.white.withValues(alpha: 0.02 + interactionEnergy * 0.04),
+          Colors.transparent,
+          Colors.black.withValues(alpha: 0.12 + ambientStage * 0.035),
+        ],
+        stops: const <double>[0.0, 0.55, 1.0],
+      ).createShader(rect);
+
+    canvas.drawRect(rect, veilPaint);
   }
 
   @override
   bool shouldRepaint(covariant _ZeronBackgroundPainter oldDelegate) {
-    return true;
+    return oldDelegate.presenceSeconds != presenceSeconds ||
+        oldDelegate.ambientStage != ambientStage ||
+        oldDelegate.interactionEnergy != interactionEnergy ||
+        oldDelegate.pointerPosition != pointerPosition;
   }
-}
-
-class _Particle {
-  _Particle({
-    required this.x,
-    required this.y,
-    required this.radius,
-    required this.opacity,
-    required this.speed,
-    required this.drift,
-    required this.seed,
-  });
-
-  double x;
-  double y;
-  double radius;
-  double opacity;
-  double speed;
-  double drift;
-  double seed;
 }

@@ -1,113 +1,124 @@
-import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-class ZeronGlow extends StatefulWidget {
+class ZeronGlow extends StatelessWidget {
   const ZeronGlow({
     super.key,
-    this.isIdle = false,
+    required this.presenceSeconds,
+    required this.ambientStage,
+    required this.interactionEnergy,
+    required this.pointerPosition,
   });
 
-  final bool isIdle;
-
-  @override
-  State<ZeronGlow> createState() => _ZeronGlowState();
-}
-
-class _ZeronGlowState extends State<ZeronGlow>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController controller;
-  late final Animation<double> glowOpacity;
-  late final Animation<double> glowScale;
-
-  @override
-  void initState() {
-    super.initState();
-
-    controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2600),
-    )..repeat(reverse: true);
-
-    final curved = CurvedAnimation(
-      parent: controller,
-      curve: Curves.easeInOut,
-    );
-
-    glowOpacity = Tween<double>(
-      begin: 0.10,
-      end: 0.18,
-    ).animate(curved);
-
-    glowScale = Tween<double>(
-      begin: 0.96,
-      end: 1.04,
-    ).animate(curved);
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
+  final double presenceSeconds;
+  final int ambientStage;
+  final double interactionEnergy;
+  final Offset pointerPosition;
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobileLike = screenWidth < 700;
-
-    final glowWidth = isMobileLike ? screenWidth * 0.72 : 320.0;
-    final glowHeight = isMobileLike ? screenWidth * 0.24 : 110.0;
-    final blurSigma = isMobileLike ? 38.0 : 48.0;
-
     return IgnorePointer(
-      child: Center(
-        child: AnimatedBuilder(
-          animation: controller,
-          builder: (context, child) {
-            final baseOpacity = glowOpacity.value;
-            final idleBoost = widget.isIdle ? 0.045 : 0.0;
-            final resolvedOpacity = (baseOpacity + idleBoost).clamp(0.0, 1.0);
-
-            final baseScale = glowScale.value;
-            final idleScaleBoost = widget.isIdle ? 0.025 : 0.0;
-
-            final t = controller.value * math.pi * 2;
-            final driftX = math.sin(t) * 2.2;
-            final driftY = math.cos(t * 0.8) * 2.8;
-            final idleDriftBoost = widget.isIdle ? 1.35 : 1.0;
-
-            return Transform.translate(
-              offset: Offset(
-                driftX * idleDriftBoost,
-                driftY * idleDriftBoost,
-              ),
-              child: Transform.scale(
-                scale: baseScale + idleScaleBoost,
-                child: Opacity(
-                  opacity: resolvedOpacity,
-                  child: child,
-                ),
-              ),
-            );
-          },
-          child: ImageFiltered(
-            imageFilter: ImageFilter.blur(
-              sigmaX: blurSigma,
-              sigmaY: blurSigma,
-            ),
-            child: Container(
-              width: glowWidth.clamp(220.0, 360.0),
-              height: glowHeight.clamp(70.0, 120.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
+      child: RepaintBoundary(
+        child: CustomPaint(
+          size: Size.infinite,
+          painter: _ZeronGlowPainter(
+            presenceSeconds: presenceSeconds,
+            ambientStage: ambientStage,
+            interactionEnergy: interactionEnergy,
+            pointerPosition: pointerPosition,
           ),
         ),
       ),
     );
+  }
+}
+
+class _ZeronGlowPainter extends CustomPainter {
+  _ZeronGlowPainter({
+    required this.presenceSeconds,
+    required this.ambientStage,
+    required this.interactionEnergy,
+    required this.pointerPosition,
+  });
+
+  final double presenceSeconds;
+  final int ambientStage;
+  final double interactionEnergy;
+  final Offset pointerPosition;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Rect rect = Offset.zero & size;
+
+    final double breath = (sin(presenceSeconds * 0.9) + 1) / 2;
+    final double stageSpread = 0.52 + (ambientStage * 0.07);
+    final double energyBoost = interactionEnergy * 0.24;
+
+    final double px = size.width == 0 ? 0.5 : (pointerPosition.dx / size.width);
+    final double py = size.height == 0 ? 0.5 : (pointerPosition.dy / size.height);
+
+    final Alignment centerA = Alignment(
+      ((px * 2) - 1) * 0.12,
+      ((py * 2) - 1) * 0.08,
+    );
+
+    final Paint mainGlow = Paint()
+      ..shader = RadialGradient(
+        center: centerA,
+        radius: stageSpread + energyBoost,
+        colors: <Color>[
+          Colors.white.withValues(
+            alpha: 0.065 + (breath * 0.03) + (ambientStage * 0.015),
+          ),
+          Colors.white.withValues(
+            alpha: 0.028 + (interactionEnergy * 0.04),
+          ),
+          Colors.transparent,
+        ],
+        stops: const <double>[0.0, 0.36, 1.0],
+      ).createShader(rect);
+
+    canvas.drawRect(rect, mainGlow);
+
+    final Paint lowerBloom = Paint()
+      ..shader = RadialGradient(
+        center: Alignment(
+          0,
+          0.78 + (sin(presenceSeconds * 0.3) * 0.03),
+        ),
+        radius: 0.72 + (ambientStage * 0.08) + (interactionEnergy * 0.1),
+        colors: <Color>[
+          Colors.white.withValues(
+            alpha: 0.03 + (ambientStage * 0.02) + (interactionEnergy * 0.04),
+          ),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+
+    canvas.drawRect(rect, lowerBloom);
+
+    if (ambientStage >= 2 || interactionEnergy > 0.18) {
+      final Paint edgeGlow = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            Colors.white.withValues(alpha: 0.012 + (interactionEnergy * 0.02)),
+            Colors.transparent,
+            Colors.white.withValues(alpha: 0.018 + (ambientStage * 0.008)),
+          ],
+        ).createShader(rect);
+
+      canvas.drawRect(rect, edgeGlow);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ZeronGlowPainter oldDelegate) {
+    return oldDelegate.presenceSeconds != presenceSeconds ||
+        oldDelegate.ambientStage != ambientStage ||
+        oldDelegate.interactionEnergy != interactionEnergy ||
+        oldDelegate.pointerPosition != pointerPosition;
   }
 }
