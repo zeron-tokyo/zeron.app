@@ -18,12 +18,21 @@ class ZeronHomeScreen extends StatefulWidget {
 class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   final Random _random = Random();
 
-  final List<String> _messagePool = const [
+  final List<String> _presenceMessagePool = const [
     'noticed something',
     'it noticed your presence',
     'you stayed here for a while',
     'the space feels different',
     'something is still here',
+  ];
+
+  final List<String> _ambientEventPool = const [
+    'did it move?',
+    'you felt that too',
+    'something shifted',
+    'the room leaned closer',
+    'it changed again',
+    'the air feels heavier',
   ];
 
   Offset? _pointerPosition;
@@ -33,6 +42,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   Timer? _idleTimer;
   Timer? _messageHideTimer;
   Timer? _ambientShiftTimer;
+  Timer? _ambientEventTimer;
 
   bool _isIdle = false;
   String? _currentMessage;
@@ -52,6 +62,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     super.initState();
     _startPresenceTimer();
     _startAmbientShiftTimer();
+    _scheduleNextAmbientEvent();
     _resetIdleTimer();
   }
 
@@ -61,6 +72,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     _idleTimer?.cancel();
     _messageHideTimer?.cancel();
     _ambientShiftTimer?.cancel();
+    _ambientEventTimer?.cancel();
     super.dispose();
   }
 
@@ -99,6 +111,34 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
       if (_ambientShiftStage == 0) return;
       _applyAmbientShift();
     });
+  }
+
+  void _scheduleNextAmbientEvent() {
+    _ambientEventTimer?.cancel();
+
+    final secondsUntilNext = 14 + _random.nextInt(10);
+
+    _ambientEventTimer = Timer(Duration(seconds: secondsUntilNext), () {
+      if (!mounted) return;
+
+      final canTrigger = _ambientShiftStage >= 1 && _currentMessage == null;
+      final shouldTrigger = _random.nextDouble() < _ambientEventChance();
+
+      if (canTrigger && shouldTrigger) {
+        _showAmbientEventMessage();
+      }
+
+      _scheduleNextAmbientEvent();
+    });
+  }
+
+  double _ambientEventChance() {
+    return switch (_ambientShiftStage) {
+      1 => 0.38,
+      2 => 0.58,
+      3 => 0.78,
+      _ => 0.0,
+    };
   }
 
   void _syncAmbientShiftStage() {
@@ -193,12 +233,28 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   }
 
   void _showPresenceMessage() {
+    _showMessage(
+      _pickRandomMessage(
+        pool: _presenceMessagePool,
+        exclude: _currentMessage,
+      ),
+    );
+  }
+
+  void _showAmbientEventMessage() {
+    _showMessage(
+      _pickRandomMessage(
+        pool: _ambientEventPool,
+        exclude: _currentMessage,
+      ),
+    );
+  }
+
+  void _showMessage(String message) {
     _messageHideTimer?.cancel();
 
-    final nextMessage = _pickRandomMessage(exclude: _currentMessage);
-
     setState(() {
-      _currentMessage = nextMessage;
+      _currentMessage = message;
     });
 
     _messageHideTimer = Timer(const Duration(seconds: 6), () {
@@ -209,12 +265,14 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     });
   }
 
-  String _pickRandomMessage({String? exclude}) {
-    final candidates =
-    _messagePool.where((message) => message != exclude).toList();
+  String _pickRandomMessage({
+    required List<String> pool,
+    String? exclude,
+  }) {
+    final candidates = pool.where((message) => message != exclude).toList();
 
     if (candidates.isEmpty) {
-      return _messagePool[_random.nextInt(_messagePool.length)];
+      return pool[_random.nextInt(pool.length)];
     }
 
     return candidates[_random.nextInt(candidates.length)];
@@ -348,7 +406,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
                       colors: [
                         Colors.transparent,
                         Colors.white.withOpacity(
-                          (_isIdle ? 0.06 : bottomGlowOpacity),
+                          _isIdle ? 0.06 : bottomGlowOpacity,
                         ),
                       ],
                     ),
