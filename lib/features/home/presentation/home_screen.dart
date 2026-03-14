@@ -32,6 +32,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   Timer? _presenceTimer;
   Timer? _idleTimer;
   Timer? _messageHideTimer;
+  Timer? _ambientShiftTimer;
 
   bool _isIdle = false;
   String? _currentMessage;
@@ -40,10 +41,17 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   bool _event45Shown = false;
   bool _event90Shown = false;
 
+  int _ambientShiftStage = 0;
+  Offset _ambientDriftOffset = Offset.zero;
+  double _ambientVeilOpacity = 0.0;
+  double _ambientBandOpacity = 0.0;
+  double _ambientScale = 1.0;
+
   @override
   void initState() {
     super.initState();
     _startPresenceTimer();
+    _startAmbientShiftTimer();
     _resetIdleTimer();
   }
 
@@ -52,6 +60,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     _presenceTimer?.cancel();
     _idleTimer?.cancel();
     _messageHideTimer?.cancel();
+    _ambientShiftTimer?.cancel();
     super.dispose();
   }
 
@@ -79,6 +88,83 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
         _event90Shown = true;
         _showPresenceMessage();
       }
+
+      _syncAmbientShiftStage();
+    });
+  }
+
+  void _startAmbientShiftTimer() {
+    _ambientShiftTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted) return;
+      if (_ambientShiftStage == 0) return;
+      _applyAmbientShift();
+    });
+  }
+
+  void _syncAmbientShiftStage() {
+    final nextStage = _calculateAmbientShiftStage();
+
+    if (nextStage != _ambientShiftStage) {
+      _ambientShiftStage = nextStage;
+      _applyAmbientShift();
+    }
+  }
+
+  int _calculateAmbientShiftStage() {
+    final seconds = _presence.inSeconds;
+
+    if (seconds >= 180) return 3;
+    if (seconds >= 120) return 2;
+    if (seconds >= 60) return 1;
+    return 0;
+  }
+
+  void _applyAmbientShift() {
+    final stage = _ambientShiftStage;
+
+    if (stage == 0) {
+      setState(() {
+        _ambientDriftOffset = Offset.zero;
+        _ambientVeilOpacity = 0.0;
+        _ambientBandOpacity = 0.0;
+        _ambientScale = 1.0;
+      });
+      return;
+    }
+
+    final maxDrift = switch (stage) {
+      1 => 8.0,
+      2 => 16.0,
+      _ => 24.0,
+    };
+
+    final veilBase = switch (stage) {
+      1 => 0.035,
+      2 => 0.06,
+      _ => 0.09,
+    };
+
+    final bandBase = switch (stage) {
+      1 => 0.03,
+      2 => 0.05,
+      _ => 0.075,
+    };
+
+    final scaleBase = switch (stage) {
+      1 => 1.01,
+      2 => 1.02,
+      _ => 1.035,
+    };
+
+    setState(() {
+      _ambientDriftOffset = Offset(
+        (_random.nextDouble() * 2 - 1) * maxDrift,
+        (_random.nextDouble() * 2 - 1) * (maxDrift * 0.5),
+      );
+
+      _ambientVeilOpacity = veilBase + (_random.nextDouble() * 0.02);
+      _ambientBandOpacity = bandBase + (_random.nextDouble() * 0.02);
+      _ambientScale = scaleBase + (_random.nextDouble() * 0.01);
     });
   }
 
@@ -136,6 +222,13 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomGlowOpacity = switch (_ambientShiftStage) {
+      1 => 0.05,
+      2 => 0.08,
+      3 => 0.12,
+      _ => 0.03,
+    };
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Listener(
@@ -148,6 +241,70 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
             const ZeronNoise(),
             ZeronBackground(
               pointerPosition: _pointerPosition,
+            ),
+            IgnorePointer(
+              child: AnimatedScale(
+                duration: const Duration(seconds: 8),
+                curve: Curves.easeInOut,
+                scale: _ambientScale,
+                child: AnimatedSlide(
+                  duration: const Duration(seconds: 8),
+                  curve: Curves.easeInOut,
+                  offset: Offset(
+                    _ambientDriftOffset.dx / 400,
+                    _ambientDriftOffset.dy / 400,
+                  ),
+                  child: AnimatedOpacity(
+                    duration: const Duration(seconds: 6),
+                    opacity: _ambientVeilOpacity,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment(0.0, -0.1),
+                          radius: 0.95,
+                          colors: [
+                            Colors.white,
+                            Colors.transparent,
+                          ],
+                          stops: [0.0, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            IgnorePointer(
+              child: Align(
+                alignment: Alignment.center,
+                child: AnimatedSlide(
+                  duration: const Duration(seconds: 8),
+                  curve: Curves.easeInOut,
+                  offset: Offset(
+                    _ambientDriftOffset.dx / 600,
+                    _ambientDriftOffset.dy / 700,
+                  ),
+                  child: AnimatedOpacity(
+                    duration: const Duration(seconds: 6),
+                    opacity: _ambientBandOpacity,
+                    child: Container(
+                      width: double.infinity,
+                      height: 220,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withOpacity(0.9),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
             ZeronGlow(
               isIdle: _isIdle,
@@ -190,7 +347,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        Colors.white.withOpacity(_isIdle ? 0.06 : 0.03),
+                        Colors.white.withOpacity(
+                          (_isIdle ? 0.06 : bottomGlowOpacity),
+                        ),
                       ],
                     ),
                   ),
