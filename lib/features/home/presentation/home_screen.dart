@@ -57,6 +57,8 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
 
   void _startPresenceTimer() {
     _presenceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+
       setState(() {
         _presence += const Duration(seconds: 1);
       });
