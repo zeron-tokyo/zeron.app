@@ -18,6 +18,11 @@ class ZeronHomeScreen extends StatefulWidget {
 class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   final Random _random = Random();
 
+  static const Duration _idleThreshold = Duration(seconds: 6);
+  static const Duration _messageDuration = Duration(seconds: 6);
+  static const Duration _presenceTick = Duration(seconds: 1);
+  static const Duration _ambientShiftTick = Duration(seconds: 8);
+
   final List<String> _presenceMessagePool = const [
     'noticed something',
     'it noticed your presence',
@@ -33,6 +38,8 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     'the room leaned closer',
     'it changed again',
     'the air feels heavier',
+    'something passed through',
+    'it changed without asking',
   ];
 
   final List<String> _memoryStillPool = const [
@@ -52,6 +59,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   Offset? _pointerPosition;
 
   Duration _presence = Duration.zero;
+
   Timer? _presenceTimer;
   Timer? _idleTimer;
   Timer? _messageHideTimer;
@@ -75,6 +83,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   double _ambientVeilOpacity = 0.0;
   double _ambientBandOpacity = 0.0;
   double _ambientScale = 1.0;
+  double _ambientVerticalBias = 0.0;
 
   @override
   void initState() {
@@ -98,11 +107,11 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   }
 
   void _startPresenceTimer() {
-    _presenceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _presenceTimer = Timer.periodic(_presenceTick, (_) {
       if (!mounted) return;
 
       setState(() {
-        _presence += const Duration(seconds: 1);
+        _presence += _presenceTick;
       });
 
       final seconds = _presence.inSeconds;
@@ -132,7 +141,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   }
 
   void _startAmbientShiftTimer() {
-    _ambientShiftTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+    _ambientShiftTimer = Timer.periodic(_ambientShiftTick, (_) {
       if (!mounted) return;
       if (_ambientShiftStage == 0) return;
       _applyAmbientShift();
@@ -208,14 +217,15 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
         _ambientVeilOpacity = 0.0;
         _ambientBandOpacity = 0.0;
         _ambientScale = 1.0;
+        _ambientVerticalBias = 0.0;
       });
       return;
     }
 
     final maxDrift = switch (stage) {
-      1 => 8.0 + (_interactionEnergy * 6),
-      2 => 16.0 + (_interactionEnergy * 10),
-      _ => 24.0 + (_interactionEnergy * 14),
+      1 => 8.0 + (_interactionEnergy * 6.0),
+      2 => 16.0 + (_interactionEnergy * 10.0),
+      _ => 24.0 + (_interactionEnergy * 14.0),
     };
 
     final veilBase = switch (stage) {
@@ -236,6 +246,12 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
       _ => 1.035,
     };
 
+    final verticalBiasBase = switch (stage) {
+      1 => 0.0,
+      2 => 0.015,
+      _ => 0.03,
+    };
+
     setState(() {
       _ambientDriftOffset = Offset(
         (_random.nextDouble() * 2 - 1) * maxDrift,
@@ -245,6 +261,8 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
       _ambientVeilOpacity = veilBase + (_random.nextDouble() * 0.02);
       _ambientBandOpacity = bandBase + (_random.nextDouble() * 0.02);
       _ambientScale = scaleBase + (_random.nextDouble() * 0.01);
+      _ambientVerticalBias =
+          verticalBiasBase + (_random.nextDouble() * 0.02);
     });
   }
 
@@ -257,7 +275,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
       });
     }
 
-    _idleTimer = Timer(const Duration(seconds: 6), () {
+    _idleTimer = Timer(_idleThreshold, () {
       if (!mounted) return;
       setState(() {
         _isIdle = true;
@@ -309,10 +327,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   }
 
   List<String> _selectMemoryReactionPool() {
-    final stayedLong = _presence.inSeconds >= 150;
     final wasActive = _interactionCount >= 18 || _interactionEnergy >= 0.45;
 
-    if (stayedLong && wasActive) {
+    if (wasActive) {
       return _memoryActivePool;
     }
 
@@ -326,7 +343,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
       _currentMessage = message;
     });
 
-    _messageHideTimer = Timer(const Duration(seconds: 6), () {
+    _messageHideTimer = Timer(_messageDuration, () {
       if (!mounted) return;
       setState(() {
         _currentMessage = null;
@@ -350,11 +367,23 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final bottomGlowOpacity = switch (_ambientShiftStage) {
-      1 => 0.05,
-      2 => 0.08,
-      3 => 0.12,
+      1 => 0.05 + (_interactionEnergy * 0.01),
+      2 => 0.08 + (_interactionEnergy * 0.02),
+      3 => 0.12 + (_interactionEnergy * 0.03),
       _ => 0.03,
     };
+
+    final veilSlideOffset = Offset(
+      _ambientDriftOffset.dx / 400,
+      (_ambientDriftOffset.dy / 400) + _ambientVerticalBias,
+    );
+
+    final bandSlideOffset = Offset(
+      _ambientDriftOffset.dx / 600,
+      (_ambientDriftOffset.dy / 700) + (_ambientVerticalBias * 0.6),
+    );
+
+    final messageOpacity = _currentMessage == null ? 0.0 : (_isIdle ? 0.9 : 0.72);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -371,16 +400,13 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
             ),
             IgnorePointer(
               child: AnimatedScale(
-                duration: const Duration(seconds: 8),
+                duration: _ambientShiftTick,
                 curve: Curves.easeInOut,
                 scale: _ambientScale,
                 child: AnimatedSlide(
-                  duration: const Duration(seconds: 8),
+                  duration: _ambientShiftTick,
                   curve: Curves.easeInOut,
-                  offset: Offset(
-                    _ambientDriftOffset.dx / 400,
-                    _ambientDriftOffset.dy / 400,
-                  ),
+                  offset: veilSlideOffset,
                   child: AnimatedOpacity(
                     duration: const Duration(seconds: 6),
                     opacity: _ambientVeilOpacity,
@@ -405,12 +431,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
               child: Align(
                 alignment: Alignment.center,
                 child: AnimatedSlide(
-                  duration: const Duration(seconds: 8),
+                  duration: _ambientShiftTick,
                   curve: Curves.easeInOut,
-                  offset: Offset(
-                    _ambientDriftOffset.dx / 600,
-                    _ambientDriftOffset.dy / 700,
-                  ),
+                  offset: bandSlideOffset,
                   child: AnimatedOpacity(
                     duration: const Duration(seconds: 6),
                     opacity: _ambientBandOpacity,
@@ -444,7 +467,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
             IgnorePointer(
               child: AnimatedOpacity(
                 duration: const Duration(milliseconds: 800),
-                opacity: _currentMessage == null ? 0 : (_isIdle ? 0.9 : 0.72),
+                opacity: messageOpacity,
                 child: Center(
                   child: Transform.translate(
                     offset: const Offset(0, 120),
