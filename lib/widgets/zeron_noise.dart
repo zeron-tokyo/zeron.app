@@ -52,21 +52,22 @@ class _ZeronNoisePainter extends CustomPainter {
     final Rect rect = Offset.zero & size;
 
     final double flicker =
-        ((sin(presenceSeconds * 13.0) + cos(presenceSeconds * 17.0)) * 0.5 + 1) /
+        ((sin(presenceSeconds * 14.0) + cos(presenceSeconds * 19.0)) * 0.5 + 1) /
             2;
 
-    final double noiseOpacity = (0.03 +
-        (ambientStage * 0.012) +
-        (interactionEnergy * 0.05) +
-        (isPointerInside ? 0.01 : 0.0))
-        .clamp(0.0, 0.16);
+    final double noiseOpacity = (0.028 +
+        (ambientStage * 0.014) +
+        (interactionEnergy * 0.055) +
+        (isPointerInside ? 0.012 : 0.0))
+        .clamp(0.0, 0.18);
 
     final Paint scanlinePaint = Paint()..style = PaintingStyle.stroke;
 
-    final double lineGap = max(2.0, 4.0 - (ambientStage * 0.35));
+    final double lineGap = max(2.0, 4.0 - (ambientStage * 0.4));
+
     for (double y = 0; y < size.height; y += lineGap) {
-      final double alpha = noiseOpacity *
-          (0.35 + (((y / lineGap) + flicker) % 3) * 0.08);
+      final double alpha =
+          noiseOpacity * (0.32 + (((y / lineGap) + flicker) % 3) * 0.09);
 
       scanlinePaint
         ..strokeWidth = 1
@@ -75,19 +76,28 @@ class _ZeronNoisePainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), scanlinePaint);
     }
 
-    final Random random = Random((presenceSeconds * 1000).floor() + ambientStage);
+    final Random random =
+    Random((presenceSeconds * 1200).floor() + ambientStage * 17);
 
     final Paint grainPaint = Paint()..style = PaintingStyle.fill;
-    final int grainCount = 180 + (ambientStage * 70) + (interactionEnergy * 140).toInt();
+
+    final int grainCount =
+        200 + (ambientStage * 80) + (interactionEnergy * 180).toInt();
 
     for (int i = 0; i < grainCount; i++) {
       final double x = random.nextDouble() * size.width;
       final double y = random.nextDouble() * size.height;
-      final double w = 0.8 + random.nextDouble() * 1.8;
-      final double h = 0.8 + random.nextDouble() * 1.8;
+
+      final double w = 0.6 + random.nextDouble() * 2.0;
+      final double h = 0.6 + random.nextDouble() * 2.0;
+
+      final double densityBias =
+          0.8 + (sin((y / size.height) * pi) * 0.4);
 
       grainPaint.color = Colors.white.withValues(
-        alpha: noiseOpacity * (0.12 + random.nextDouble() * 0.65),
+        alpha: noiseOpacity *
+            (0.1 + random.nextDouble() * 0.7) *
+            densityBias,
       );
 
       canvas.drawRect(Rect.fromLTWH(x, y, w, h), grainPaint);
@@ -99,13 +109,19 @@ class _ZeronNoisePainter extends CustomPainter {
         radius: 1.08,
         colors: <Color>[
           Colors.transparent,
-          Colors.black.withValues(alpha: 0.08 + ambientStage * 0.03),
-          Colors.black.withValues(alpha: 0.2 + ambientStage * 0.06),
+          Colors.black.withValues(alpha: 0.09 + ambientStage * 0.035),
+          Colors.black.withValues(alpha: 0.22 + ambientStage * 0.07),
         ],
         stops: const <double>[0.0, 0.72, 1.0],
       ).createShader(rect);
 
     canvas.drawRect(rect, vignette);
+
+    final double hazeY =
+        size.height * (0.30 + (sin(presenceSeconds * 0.55) * 0.09));
+
+    final double hazeStrength =
+        0.012 + (interactionEnergy * 0.02) + (ambientStage * 0.01);
 
     final Paint horizontalHaze = Paint()
       ..shader = LinearGradient(
@@ -113,15 +129,15 @@ class _ZeronNoisePainter extends CustomPainter {
         end: Alignment.centerRight,
         colors: <Color>[
           Colors.transparent,
-          Colors.white.withValues(alpha: 0.01 + interactionEnergy * 0.015),
+          Colors.white.withValues(alpha: hazeStrength),
           Colors.transparent,
         ],
       ).createShader(
         Rect.fromLTWH(
           0,
-          size.height * (0.32 + (sin(presenceSeconds * 0.6) * 0.08)),
+          hazeY,
           size.width,
-          120,
+          120 + ambientStage * 20,
         ),
       );
 
