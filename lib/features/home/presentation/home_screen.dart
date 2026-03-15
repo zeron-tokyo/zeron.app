@@ -17,7 +17,8 @@ class ZeronHomeScreen extends StatefulWidget {
   State<ZeronHomeScreen> createState() => _ZeronHomeScreenState();
 }
 
-class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
+class _ZeronHomeScreenState extends State<ZeronHomeScreen>
+    with WidgetsBindingObserver {
   static const Duration _tickRate = Duration(milliseconds: 100);
 
   static const String _keyTotalSessions = 'zeron_total_sessions';
@@ -48,6 +49,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   bool _isMemoryLoaded = false;
   bool _hasSavedSessionSummary = false;
   bool _hasTriggeredPersistentMemory = false;
+  bool _isSavingSessionSummary = false;
 
   Offset _pointerPosition = Offset.zero;
   Offset _pointerTarget = Offset.zero;
@@ -74,6 +76,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scheduleNextAmbientEvent();
     _loadMemoryLayer();
     _ticker = Timer.periodic(_tickRate, _onTick);
@@ -81,9 +84,20 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _saveSessionSummary();
     _ticker?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _saveSessionSummary();
+    }
   }
 
   Future<void> _loadMemoryLayer() async {
@@ -157,8 +171,8 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     _ambientDrift = (sin(t * 0.12) + 1) * 0.5;
     _ambientPulse = (sin(t * 1.8) + 1) * 0.5;
 
-    _interactionEnergy = (_interactionEnergy - (0.015 * deltaSeconds))
-        .clamp(0.0, 1.0);
+    _interactionEnergy =
+        (_interactionEnergy - (0.015 * deltaSeconds)).clamp(0.0, 1.0);
 
     _pointerPosition =
         Offset.lerp(_pointerPosition, _pointerTarget, 0.08) ?? _pointerPosition;
@@ -346,12 +360,12 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   }
 
   Future<void> _saveSessionSummary() async {
-    if (_hasSavedSessionSummary) return;
+    if (_hasSavedSessionSummary || _isSavingSessionSummary) return;
 
     final SharedPreferences? prefs = _prefs;
     if (prefs == null) return;
 
-    _hasSavedSessionSummary = true;
+    _isSavingSessionSummary = true;
 
     final int previousPresence = prefs.getInt(_keyTotalPresenceSeconds) ?? 0;
     final int newPresence = previousPresence + _presence.inSeconds;
@@ -360,6 +374,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
 
     await prefs.setInt(_keyTotalPresenceSeconds, newPresence);
     await prefs.setInt(_keyMaxAmbientStage, newMaxStage);
+
+    _hasSavedSessionSummary = true;
+    _isSavingSessionSummary = false;
   }
 
   void _onPointerHover(PointerHoverEvent event) {
@@ -424,25 +441,29 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
                 ZeronDistortion(
                   presenceSeconds: _presence.inMilliseconds / 1000.0,
                   ambientStage: _ambientStage,
-                  interactionEnergy: _interactionEnergy + (_ambientDrift * 0.025),
+                  interactionEnergy:
+                  _interactionEnergy + (_ambientDrift * 0.025),
                   pointerPosition: _pointerPosition,
                 ),
                 ZeronNoise(
                   presenceSeconds: _presence.inMilliseconds / 1000.0,
                   ambientStage: _ambientStage,
-                  interactionEnergy: _interactionEnergy + (_ambientPulse * 0.02),
+                  interactionEnergy:
+                  _interactionEnergy + (_ambientPulse * 0.02),
                   isPointerInside: _isPointerInside,
                 ),
                 ZeronBackground(
                   presenceSeconds: _presence.inMilliseconds / 1000.0,
                   ambientStage: _ambientStage,
-                  interactionEnergy: _interactionEnergy + (_ambientBreath * 0.05),
+                  interactionEnergy:
+                  _interactionEnergy + (_ambientBreath * 0.05),
                   pointerPosition: _pointerPosition,
                 ),
                 ZeronGlow(
                   presenceSeconds: _presence.inMilliseconds / 1000.0,
                   ambientStage: _ambientStage,
-                  interactionEnergy: _interactionEnergy + (_ambientPulse * 0.03),
+                  interactionEnergy:
+                  _interactionEnergy + (_ambientPulse * 0.03),
                   pointerPosition: _pointerPosition,
                   memoryPresence: _storedTotalSessions > 0 ? 0.08 : 0.0,
                   memoryType: _storedMemoryImprint,
