@@ -6,7 +6,7 @@ class ZeronApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
       theme: ThemeData.dark().copyWith(
@@ -14,7 +14,7 @@ class ZeronApp extends StatelessWidget {
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
       ),
-      home: ZeronHomeScreen(),
+      home: const ZeronHomeScreen(),
     );
   }
 }
