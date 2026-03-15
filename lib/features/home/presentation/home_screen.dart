@@ -76,9 +76,12 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addObserver(this);
+
     _scheduleNextAmbientEvent();
     _loadMemoryLayer();
+
     _ticker = Timer.periodic(_tickRate, _onTick);
   }
 
@@ -196,7 +199,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
       _ambientEventUntil = null;
     }
 
-    setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _updateAmbientStage() {
