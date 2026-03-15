@@ -38,6 +38,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
   int _interactionCount = 0;
 
   double _interactionEnergy = 0.0;
+  double _ambientBreath = 0.0;
+  double _ambientDrift = 0.0;
+  double _ambientPulse = 0.0;
   double _peakInteractionEnergy = 0.0;
 
   bool _isPointerInside = false;
@@ -96,10 +99,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     final String lastVisitAt = prefs.getString(_keyLastVisitAt) ?? '';
 
     await prefs.setInt(_keyTotalSessions, totalSessions + 1);
-    await prefs.setString(
-      _keyLastVisitAt,
-      DateTime.now().toIso8601String(),
-    );
+    await prefs.setString(_keyLastVisitAt, DateTime.now().toIso8601String());
 
     _prefs = prefs;
 
@@ -150,6 +150,12 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
     final double deltaSeconds = _tickRate.inMilliseconds / 1000.0;
 
     _presence += _tickRate;
+
+    final double t = _presence.inMilliseconds / 1000.0;
+
+    _ambientBreath = (sin(t * 0.35) + 1) * 0.5;
+    _ambientDrift = (sin(t * 0.12) + 1) * 0.5;
+    _ambientPulse = (sin(t * 1.8) + 1) * 0.5;
 
     _interactionEnergy = (_interactionEnergy - (0.015 * deltaSeconds))
         .clamp(0.0, 1.0);
@@ -400,63 +406,78 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen> {
         child: MouseRegion(
           onEnter: _onPointerEnter,
           onExit: _onPointerExit,
-          child: Stack(
-            fit: StackFit.expand,
-            children: <Widget>[
-              ZeronDistortion(
-                presenceSeconds: _presence.inMilliseconds / 1000.0,
-                ambientStage: _ambientStage,
-                interactionEnergy: _interactionEnergy,
-                pointerPosition: _pointerPosition,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOutCubic,
+            transform: Matrix4.identity()
+              ..translate(
+                (_ambientDrift - 0.5) * 10,
+                (_ambientBreath - 0.5) * 8,
+              )
+              ..rotateZ((_ambientDrift - 0.5) * 0.012)
+              ..scale(
+                1.0 + (_ambientBreath * 0.006) + (_ambientStage * 0.002),
               ),
-              ZeronNoise(
-                presenceSeconds: _presence.inMilliseconds / 1000.0,
-                ambientStage: _ambientStage,
-                interactionEnergy: _interactionEnergy,
-                isPointerInside: _isPointerInside,
-              ),
-              ZeronBackground(
-                presenceSeconds: _presence.inMilliseconds / 1000.0,
-                ambientStage: _ambientStage,
-                interactionEnergy: _interactionEnergy,
-                pointerPosition: _pointerPosition,
-              ),
-              ZeronGlow(
-                presenceSeconds: _presence.inMilliseconds / 1000.0,
-                ambientStage: _ambientStage,
-                interactionEnergy: _interactionEnergy,
-                pointerPosition: _pointerPosition,
-              ),
-              Center(
-                child: IgnorePointer(
-                  child: AnimatedScale(
-                    scale: 1.0 +
-                        (_ambientStage * 0.008) +
-                        (_interactionEnergy * 0.02) +
-                        (_storedTotalSessions > 0 ? 0.004 : 0.0),
-                    duration: const Duration(milliseconds: 700),
-                    curve: Curves.easeOutCubic,
-                    child: const ZeronLogo(),
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                ZeronDistortion(
+                  presenceSeconds: _presence.inMilliseconds / 1000.0,
+                  ambientStage: _ambientStage,
+                  interactionEnergy: _interactionEnergy + (_ambientDrift * 0.025),
+                  pointerPosition: _pointerPosition,
+                ),
+                ZeronNoise(
+                  presenceSeconds: _presence.inMilliseconds / 1000.0,
+                  ambientStage: _ambientStage,
+                  interactionEnergy: _interactionEnergy + (_ambientPulse * 0.02),
+                  isPointerInside: _isPointerInside,
+                ),
+                ZeronBackground(
+                  presenceSeconds: _presence.inMilliseconds / 1000.0,
+                  ambientStage: _ambientStage,
+                  interactionEnergy: _interactionEnergy + (_ambientBreath * 0.05),
+                  pointerPosition: _pointerPosition,
+                ),
+                ZeronGlow(
+                  presenceSeconds: _presence.inMilliseconds / 1000.0,
+                  ambientStage: _ambientStage,
+                  interactionEnergy: _interactionEnergy + (_ambientPulse * 0.03),
+                  pointerPosition: _pointerPosition,
+                  memoryPresence: _storedTotalSessions > 0 ? 0.08 : 0.0,
+                  memoryType: _storedMemoryImprint,
+                ),
+                Center(
+                  child: IgnorePointer(
+                    child: AnimatedScale(
+                      scale: 1.0 +
+                          (_ambientStage * 0.008) +
+                          (_interactionEnergy * 0.02) +
+                          (_storedTotalSessions > 0 ? 0.004 : 0.0),
+                      duration: const Duration(milliseconds: 700),
+                      curve: Curves.easeOutCubic,
+                      child: const ZeronLogo(),
+                    ),
                   ),
                 ),
-              ),
-              if (overlayMessage != null)
-                _PresenceMessage(
-                  message: overlayMessage,
-                  stage: _ambientStage,
-                  interactionEnergy: _interactionEnergy,
+                if (overlayMessage != null)
+                  _PresenceMessage(
+                    message: overlayMessage,
+                    stage: _ambientStage,
+                    interactionEnergy: _interactionEnergy,
+                  ),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: _BottomGradient(
+                    stage: _ambientStage,
+                    interactionEnergy: _interactionEnergy,
+                    presenceSeconds: _presence.inMilliseconds / 1000.0,
+                    isIdle: _isIdle,
+                    memoryBoost: _storedTotalSessions > 0 ? 0.03 : 0.0,
+                  ),
                 ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: _BottomGradient(
-                  stage: _ambientStage,
-                  interactionEnergy: _interactionEnergy,
-                  presenceSeconds: _presence.inMilliseconds / 1000.0,
-                  isIdle: _isIdle,
-                  memoryBoost: _storedTotalSessions > 0 ? 0.03 : 0.0,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
