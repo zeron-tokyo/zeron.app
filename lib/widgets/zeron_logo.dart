@@ -1,4 +1,5 @@
-import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 class ZeronLogo extends StatefulWidget {
@@ -15,101 +16,126 @@ class ZeronLogo extends StatefulWidget {
 
 class _ZeronLogoState extends State<ZeronLogo>
     with SingleTickerProviderStateMixin {
-  late final AnimationController controller;
-  late final Animation<double> scale;
-  late final Animation<double> opacity;
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+  late final Animation<double> _opacity;
+  late final Animation<double> _glowOpacity;
+  late final Animation<double> _floatY;
 
   @override
   void initState() {
     super.initState();
 
-    controller = AnimationController(
+    _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2800),
+      duration: Duration(milliseconds: widget.isIdle ? 4200 : 2800),
     )..repeat(reverse: true);
 
     final curved = CurvedAnimation(
-      parent: controller,
+      parent: _controller,
       curve: Curves.easeInOut,
     );
 
-    scale = Tween<double>(
-      begin: 0.988,
-      end: 1.028,
+    _scale = Tween<double>(
+      begin: widget.isIdle ? 0.992 : 0.986,
+      end: widget.isIdle ? 1.008 : 1.022,
     ).animate(curved);
 
-    opacity = Tween<double>(
-      begin: 0.84,
+    _opacity = Tween<double>(
+      begin: widget.isIdle ? 0.90 : 0.84,
       end: 1.0,
+    ).animate(curved);
+
+    _glowOpacity = Tween<double>(
+      begin: widget.isIdle ? 0.10 : 0.14,
+      end: widget.isIdle ? 0.18 : 0.24,
+    ).animate(curved);
+
+    _floatY = Tween<double>(
+      begin: widget.isIdle ? 1.5 : 2.0,
+      end: widget.isIdle ? -1.5 : -2.0,
     ).animate(curved);
   }
 
   @override
   void dispose() {
-    controller.dispose();
+    _controller.dispose();
     super.dispose();
+  }
+
+  double _logoSize(double screenWidth) {
+    if (screenWidth >= 1400) return 220;
+    if (screenWidth >= 1000) return 180;
+    if (screenWidth >= 700) return 150;
+    return screenWidth * 0.34;
   }
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-
-    final isMobileLike = screenWidth < 700;
-
-    final fontSize = isMobileLike ? screenWidth * 0.105 : 40.0;
-
-    final letterSpacing = isMobileLike ? screenWidth * 0.02 : 8.0;
+    final logoSize = _logoSize(screenWidth);
 
     return AnimatedBuilder(
-      animation: controller,
+      animation: _controller,
       builder: (context, child) {
-        final idleOpacityOffset = widget.isIdle ? -0.16 : 0.0;
-
-        final resolvedOpacity =
-        (opacity.value + idleOpacityOffset).clamp(0.0, 1.0);
-
-        final t = controller.value * math.pi * 2;
-
-        final driftX = math.sin(t) * 2.0;
-
-        final driftY = math.cos(t * 0.85) * 2.6;
-
-        final idleDriftBoost = widget.isIdle ? 1.45 : 1.0;
-
-        return Transform.translate(
-          offset: Offset(
-            driftX * idleDriftBoost,
-            driftY * idleDriftBoost,
-          ),
-          child: Opacity(
-            opacity: resolvedOpacity,
+        return Opacity(
+          opacity: _opacity.value,
+          child: Transform.translate(
+            offset: Offset(0, _floatY.value),
             child: Transform.scale(
-              scale: scale.value,
-              child: child,
+              scale: _scale.value,
+              child: SizedBox(
+                width: logoSize,
+                height: logoSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Opacity(
+                      opacity: _glowOpacity.value,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: 20,
+                          sigmaY: 20,
+                        ),
+                        child: Image.asset(
+                          'assets/brand/zeron_symbol_white.png',
+                          width: logoSize * 0.92,
+                          height: logoSize * 0.92,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                    ),
+                    Opacity(
+                      opacity: _glowOpacity.value * 0.55,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: 42,
+                          sigmaY: 42,
+                        ),
+                        child: Image.asset(
+                          'assets/brand/zeron_symbol_white.png',
+                          width: logoSize * 1.02,
+                          height: logoSize * 1.02,
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                    ),
+                    Image.asset(
+                      'assets/brand/zeron_symbol_white.png',
+                      width: logoSize,
+                      height: logoSize,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         );
       },
-      child: Text(
-        'ZERON',
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: fontSize.clamp(30.0, 48.0),
-          letterSpacing: letterSpacing.clamp(5.0, 10.0),
-          fontWeight: FontWeight.w300,
-          shadows: const [
-            Shadow(
-              color: Color.fromRGBO(255, 255, 255, 0.22),
-              blurRadius: 14,
-            ),
-            Shadow(
-              color: Color.fromRGBO(255, 255, 255, 0.1),
-              blurRadius: 28,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
