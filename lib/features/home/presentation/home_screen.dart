@@ -78,10 +78,8 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     super.initState();
 
     WidgetsBinding.instance.addObserver(this);
-
     _scheduleNextAmbientEvent();
     _loadMemoryLayer();
-
     _ticker = Timer.periodic(_tickRate, _onTick);
   }
 
@@ -428,82 +426,166 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
         child: MouseRegion(
           onEnter: _onPointerEnter,
           onExit: _onPointerExit,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 900),
-            curve: Curves.easeOutCubic,
-            transform: Matrix4.identity()
-              ..translate(
-                (_ambientDrift - 0.5) * 10,
-                (_ambientBreath - 0.5) * 8,
-              )
-              ..rotateZ((_ambientDrift - 0.5) * 0.012)
-              ..scale(
-                1.0 + (_ambientBreath * 0.006) + (_ambientStage * 0.002),
-              ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                ZeronDistortion(
-                  presenceSeconds: _presence.inMilliseconds / 1000.0,
-                  ambientStage: _ambientStage,
-                  interactionEnergy:
-                  _interactionEnergy + (_ambientDrift * 0.025),
-                  pointerPosition: _pointerPosition,
-                ),
-                ZeronNoise(
-                  presenceSeconds: _presence.inMilliseconds / 1000.0,
-                  ambientStage: _ambientStage,
-                  interactionEnergy:
-                  _interactionEnergy + (_ambientPulse * 0.02),
-                  isPointerInside: _isPointerInside,
-                ),
-                ZeronBackground(
-                  presenceSeconds: _presence.inMilliseconds / 1000.0,
-                  ambientStage: _ambientStage,
-                  interactionEnergy:
-                  _interactionEnergy + (_ambientBreath * 0.05),
-                  pointerPosition: _pointerPosition,
-                ),
-                ZeronGlow(
-                  presenceSeconds: _presence.inMilliseconds / 1000.0,
-                  ambientStage: _ambientStage,
-                  interactionEnergy:
-                  _interactionEnergy + (_ambientPulse * 0.03),
-                  pointerPosition: _pointerPosition,
-                  memoryPresence: _storedTotalSessions > 0 ? 0.08 : 0.0,
-                  memoryType: _storedMemoryImprint,
-                ),
-                Center(
-                  child: IgnorePointer(
-                    child: AnimatedScale(
-                      scale: 1.0 +
-                          (_ambientStage * 0.008) +
-                          (_interactionEnergy * 0.02) +
-                          (_storedTotalSessions > 0 ? 0.004 : 0.0),
-                      duration: const Duration(milliseconds: 700),
-                      curve: Curves.easeOutCubic,
-                      child: const ZeronLogo(),
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              final double width = constraints.maxWidth;
+              final double height = constraints.maxHeight;
+              final bool isCompact = width < 700;
+
+              final double brandTop = isCompact ? 28 : 40;
+              final double brandFontSize = isCompact ? 11 : 12.5;
+              final double brandLetterSpacing = isCompact ? 3.8 : 4.8;
+
+              final double footerBottom = height < 760 ? 24 : 34;
+              final double footerFontSize = isCompact ? 9.4 : 10.5;
+              final double footerLetterSpacing = isCompact ? 2.8 : 3.5;
+
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 900),
+                curve: Curves.easeOutCubic,
+                transform: Matrix4.identity()
+                  ..translate(
+                    (_ambientDrift - 0.5) * 10,
+                    (_ambientBreath - 0.5) * 8,
+                  )
+                  ..rotateZ((_ambientDrift - 0.5) * 0.012)
+                  ..scale(
+                    1.0 + (_ambientBreath * 0.006) + (_ambientStage * 0.002),
+                  ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    ZeronDistortion(
+                      presenceSeconds: _presence.inMilliseconds / 1000.0,
+                      ambientStage: _ambientStage,
+                      interactionEnergy:
+                          _interactionEnergy + (_ambientDrift * 0.025),
+                      pointerPosition: _pointerPosition,
                     ),
-                  ),
+                    ZeronNoise(
+                      presenceSeconds: _presence.inMilliseconds / 1000.0,
+                      ambientStage: _ambientStage,
+                      interactionEnergy:
+                          _interactionEnergy + (_ambientPulse * 0.02),
+                      isPointerInside: _isPointerInside,
+                    ),
+                    ZeronBackground(
+                      presenceSeconds: _presence.inMilliseconds / 1000.0,
+                      ambientStage: _ambientStage,
+                      interactionEnergy:
+                          _interactionEnergy + (_ambientBreath * 0.05),
+                      pointerPosition: _pointerPosition,
+                    ),
+                    ZeronGlow(
+                      presenceSeconds: _presence.inMilliseconds / 1000.0,
+                      ambientStage: _ambientStage,
+                      interactionEnergy:
+                          _interactionEnergy + (_ambientPulse * 0.03),
+                      pointerPosition: _pointerPosition,
+                      memoryPresence: _storedTotalSessions > 0 ? 0.08 : 0.0,
+                      memoryType: _storedMemoryImprint,
+                    ),
+                    IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: <Color>[
+                              Colors.white.withValues(alpha: 0.018),
+                              Colors.transparent,
+                              Colors.white.withValues(alpha: 0.01),
+                            ],
+                            stops: const <double>[0.0, 0.5, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                    SafeArea(
+                      child: Stack(
+                        children: <Widget>[
+                          Align(
+                            alignment: Alignment.topCenter,
+                            child: Padding(
+                              padding: EdgeInsets.only(top: brandTop),
+                              child: Text(
+                                'ZERON TOKYO',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.42),
+                                  fontSize: brandFontSize,
+                                  fontWeight: FontWeight.w300,
+                                  letterSpacing: brandLetterSpacing,
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                          Center(
+                            child: IgnorePointer(
+                              child: AnimatedScale(
+                                scale: 1.0 +
+                                    (_ambientStage * 0.008) +
+                                    (_interactionEnergy * 0.02) +
+                                    (_storedTotalSessions > 0 ? 0.004 : 0.0),
+                                duration: const Duration(milliseconds: 700),
+                                curve: Curves.easeOutCubic,
+                                child: ZeronLogo(isIdle: _isIdle),
+                              ),
+                            ),
+                          ),
+                          if (overlayMessage != null)
+                            _PresenceMessage(
+                              message: overlayMessage,
+                              stage: _ambientStage,
+                              interactionEnergy: _interactionEnergy,
+                            ),
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: Padding(
+                              padding: EdgeInsets.only(bottom: footerBottom),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  Container(
+                                    width: isCompact ? 44 : 52,
+                                    height: 1,
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                  ),
+                                  SizedBox(height: isCompact ? 12 : 14),
+                                  Text(
+                                    'AMBIENT PRESENCE INTERFACE',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.28),
+                                      fontSize: footerFontSize,
+                                      fontWeight: FontWeight.w300,
+                                      letterSpacing: footerLetterSpacing,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: _BottomGradient(
+                        stage: _ambientStage,
+                        interactionEnergy: _interactionEnergy,
+                        presenceSeconds: _presence.inMilliseconds / 1000.0,
+                        isIdle: _isIdle,
+                        memoryBoost: _storedTotalSessions > 0 ? 0.03 : 0.0,
+                      ),
+                    ),
+                  ],
                 ),
-                if (overlayMessage != null)
-                  _PresenceMessage(
-                    message: overlayMessage,
-                    stage: _ambientStage,
-                    interactionEnergy: _interactionEnergy,
-                  ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _BottomGradient(
-                    stage: _ambientStage,
-                    interactionEnergy: _interactionEnergy,
-                    presenceSeconds: _presence.inMilliseconds / 1000.0,
-                    isIdle: _isIdle,
-                    memoryBoost: _storedTotalSessions > 0 ? 0.03 : 0.0,
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -545,7 +627,7 @@ class _PresenceMessage extends StatelessWidget {
               curve: Curves.easeOut,
               child: Container(
                 padding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.03),
                   borderRadius: BorderRadius.circular(999),
@@ -590,10 +672,10 @@ class _BottomGradient extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double intensity = (0.14 +
-        (stage * 0.07) +
-        (interactionEnergy * 0.28) +
-        (isIdle ? 0.04 : 0.0) +
-        memoryBoost)
+            (stage * 0.07) +
+            (interactionEnergy * 0.28) +
+            (isIdle ? 0.04 : 0.0) +
+            memoryBoost)
         .clamp(0.0, 0.6);
 
     final double height = 220 + (stage * 30) + (interactionEnergy * 80);
