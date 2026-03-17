@@ -27,8 +27,8 @@ class _ZeronBackgroundState extends State<ZeronBackground>
 
   Size _lastSize = Size.zero;
 
-  static const int _baseParticleCount = 58;
-  static const int _maxAdditionalParticles = 18;
+  static const int _baseParticleCount = 42;
+  static const int _maxAdditionalParticles = 12;
 
   @override
   void initState() {
@@ -55,7 +55,7 @@ class _ZeronBackgroundState extends State<ZeronBackground>
 
   int _targetParticleCount() {
     return (_baseParticleCount +
-            (widget.ambientStage * 4) +
+            (widget.ambientStage * 3) +
             (widget.interactionEnergy * _maxAdditionalParticles).round())
         .clamp(_baseParticleCount, _baseParticleCount + _maxAdditionalParticles);
   }
@@ -137,33 +137,36 @@ class _Particle {
   _Particle({
     required this.x,
     required this.y,
-    required this.baseSpeed,
     required this.depth,
-    required this.size,
-    required this.opacity,
-    required this.seed,
-    required this.driftSeed,
+    required this.baseSize,
+    required this.baseOpacity,
+    required this.phase,
+    required this.streamSeed,
+    required this.orbitSeed,
+    required this.driftDirection,
   });
 
   double x;
   double y;
-  double baseSpeed;
   double depth;
-  double size;
-  double opacity;
-  double seed;
-  double driftSeed;
+  double baseSize;
+  double baseOpacity;
+  double phase;
+  double streamSeed;
+  double orbitSeed;
+  double driftDirection;
 
   factory _Particle.random(Random random) {
     return _Particle(
       x: random.nextDouble(),
-      y: random.nextDouble() * 1.2 - 0.1,
-      baseSpeed: 0.00016 + (random.nextDouble() * 0.00034),
-      depth: 0.45 + (random.nextDouble() * 1.5),
-      size: 0.55 + (random.nextDouble() * 1.8),
-      opacity: 0.045 + (random.nextDouble() * 0.14),
-      seed: random.nextDouble() * pi * 2,
-      driftSeed: random.nextDouble() * pi * 2,
+      y: random.nextDouble(),
+      depth: 0.18 + (random.nextDouble() * 0.82),
+      baseSize: 0.5 + (random.nextDouble() * 1.7),
+      baseOpacity: 0.035 + (random.nextDouble() * 0.12),
+      phase: random.nextDouble() * pi * 2,
+      streamSeed: random.nextDouble() * pi * 2,
+      orbitSeed: random.nextDouble() * pi * 2,
+      driftDirection: random.nextBool() ? 1.0 : -1.0,
     );
   }
 
@@ -173,39 +176,40 @@ class _Particle {
     required double stageEnergy,
     required double time,
   }) {
-    final double verticalSpeed =
-        baseSpeed * (0.88 + depth * 0.72) * (1.0 + stageEnergy * 0.18);
+    final double depthSpeed = lerpDouble(0.00022, 0.00145, depth)!;
+    y += depthSpeed * (1.0 + stageEnergy * 0.10);
 
-    y += verticalSpeed;
+    final double horizontalStream = sin((time * 0.11) + streamSeed + (y * 5.8)) *
+        (0.00010 + depth * 0.00018);
 
-    final double stream =
-        sin((time * 0.12) + driftSeed + (y * 4.0)) * 0.00012 * depth;
+    final double orbitalDrift = cos((time * 0.07) + orbitSeed + (x * 4.0)) *
+        (0.00004 + depth * 0.00008) *
+        driftDirection;
 
-    final double orbital =
-        cos((time * 0.08) + seed + (y * 2.8)) * 0.00005 * (0.6 + depth);
+    final double centerPull = ((0.5 - x) * (0.000025 + depth * 0.000045));
 
-    x += stream + orbital;
+    x += horizontalStream + orbitalDrift + centerPull;
 
     final double dx = x - pointer.dx;
     final double dy = y - pointer.dy;
     final double distance = sqrt((dx * dx) + (dy * dy));
 
-    if (distance < 0.16) {
-      final double influence = (0.16 - distance) *
-          (0.00055 + interactionEnergy * 0.0009) *
-          (0.7 + depth * 0.4);
+    if (distance < 0.14) {
+      final double repulsion = (0.14 - distance) *
+          (0.00032 + interactionEnergy * 0.00065) *
+          (0.55 + depth * 0.7);
 
-      x += dx * influence;
-      y += dy * influence * 0.45;
+      x += dx * repulsion;
+      y += dy * repulsion * 0.22;
     }
 
     if (x < -0.08) x = 1.08;
     if (x > 1.08) x = -0.08;
 
-    if (y > 1.08) {
+    if (y > 1.10) {
       y = -0.10;
-      x = (x + 0.08 + sin(seed + time * 0.03) * 0.06) % 1.0;
-      if (x < 0) x += 1.0;
+      x = 0.14 + Random((phase * 100000).round() + (time * 10).round())
+          .nextDouble() * 0.72;
     }
   }
 }
@@ -227,29 +231,29 @@ class _BackgroundPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()..style = PaintingStyle.fill;
 
-    final double breath = (sin(presenceSeconds * 0.18) + 1) * 0.5;
-    final double stageBoost = ambientStage * 0.012;
+    final double breath = (sin(presenceSeconds * 0.16) + 1) * 0.5;
+    final double stageBoost = ambientStage * 0.010;
 
     for (final _Particle particle in particles) {
-      final double pulse = (sin(
-                (presenceSeconds * (0.28 + particle.depth * 0.12)) +
-                    particle.seed,
+      final double twinkle = (sin(
+                (presenceSeconds * (0.22 + particle.depth * 0.55)) +
+                    particle.phase,
               ) +
               1) *
           0.5;
 
-      final double opacity = (particle.opacity +
-              (pulse * 0.035) +
-              (breath * 0.018) +
-              (interactionEnergy * 0.05) +
-              stageBoost)
-          .clamp(0.025, 0.22);
+      final double radius = (particle.baseSize *
+              (0.55 + particle.depth * 1.35) +
+              (twinkle * 0.16) +
+              (interactionEnergy * 0.08))
+          .clamp(0.35, 2.7);
 
-      final double radius = (particle.size *
-              (0.8 + particle.depth * 0.58) +
-              (pulse * 0.28) +
-              (interactionEnergy * 0.22))
-          .clamp(0.45, 3.2);
+      final double opacity = (particle.baseOpacity +
+              (twinkle * 0.030) +
+              (breath * 0.014) +
+              stageBoost +
+              (interactionEnergy * 0.028))
+          .clamp(0.025, 0.20);
 
       paint.color = Colors.white.withValues(alpha: opacity);
 
