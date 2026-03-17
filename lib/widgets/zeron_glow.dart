@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 class ZeronGlow extends StatelessWidget {
@@ -59,133 +58,129 @@ class _ZeronGlowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Rect rect = Offset.zero & size;
+    final rect = Offset.zero & size;
 
-    final double breath = (sin(presenceSeconds * 0.75) + 1) / 2;
+    final double breath = (sin(presenceSeconds * 0.6) + 1) / 2;
 
-    final double memoryBoost = memoryPresence.clamp(0.0, 0.18);
-
-    final double stageSpread =
-        0.52 + (ambientStage * 0.085) + (memoryBoost * 0.45);
-
-    final double energyBoost = interactionEnergy * 0.28;
+    final double memoryBoost = memoryPresence.clamp(0.0, 0.14);
 
     final double px =
-    size.width == 0 ? 0.5 : (pointerPosition.dx / size.width).clamp(0.0, 1.0);
-
+        size.width == 0 ? 0.5 : (pointerPosition.dx / size.width).clamp(0.0, 1.0);
     final double py =
-    size.height == 0 ? 0.5 : (pointerPosition.dy / size.height).clamp(0.0, 1.0);
+        size.height == 0 ? 0.5 : (pointerPosition.dy / size.height).clamp(0.0, 1.0);
 
-    final Alignment centerA = Alignment(
-      ((px * 2) - 1) * 0.16,
-      ((py * 2) - 1) * 0.11,
+    final Alignment center = Alignment(
+      ((px * 2) - 1) * 0.12,
+      ((py * 2) - 1) * 0.08,
     );
 
     final double coreAlpha =
-        0.07 + (breath * 0.035) + (ambientStage * 0.02) + (memoryBoost * 0.35);
+        0.04 + (breath * 0.02) + (ambientStage * 0.015) + (memoryBoost * 0.2);
 
     final double midAlpha =
-        0.03 + (interactionEnergy * 0.045) + (memoryBoost * 0.16);
+        0.018 + (interactionEnergy * 0.025) + (memoryBoost * 0.1);
 
-    final Paint mainGlow = Paint()
+    final Paint main = Paint()
       ..shader = RadialGradient(
-        center: centerA,
-        radius: stageSpread + energyBoost,
-        colors: <Color>[
+        center: center,
+        radius: 0.55 +
+            (ambientStage * 0.06) +
+            (interactionEnergy * 0.12) +
+            (memoryBoost * 0.25),
+        colors: [
           Colors.white.withValues(alpha: coreAlpha),
           Colors.white.withValues(alpha: midAlpha),
           Colors.transparent,
         ],
-        stops: const <double>[0.0, 0.36, 1.0],
+        stops: const [0.0, 0.4, 1.0],
       ).createShader(rect);
 
-    canvas.drawRect(rect, mainGlow);
+    canvas.drawRect(rect, main);
 
-    final Paint lowerBloom = Paint()
+    // 下部の空気感（かなり弱く）
+    final Paint lower = Paint()
       ..shader = RadialGradient(
         center: Alignment(
           0,
-          0.78 + (sin(presenceSeconds * 0.28) * 0.035),
+          0.82 + (sin(presenceSeconds * 0.22) * 0.03),
         ),
-        radius: 0.72 +
-            (ambientStage * 0.09) +
-            (interactionEnergy * 0.12) +
-            (memoryBoost * 0.32),
-        colors: <Color>[
+        radius: 0.6 +
+            (ambientStage * 0.07) +
+            (interactionEnergy * 0.08) +
+            (memoryBoost * 0.2),
+        colors: [
           Colors.white.withValues(
-            alpha: 0.035 +
-                (ambientStage * 0.024) +
-                (interactionEnergy * 0.045) +
-                (memoryBoost * 0.22),
+            alpha: 0.02 +
+                (ambientStage * 0.015) +
+                (interactionEnergy * 0.02) +
+                (memoryBoost * 0.12),
           ),
           Colors.transparent,
         ],
       ).createShader(rect);
 
-    canvas.drawRect(rect, lowerBloom);
+    canvas.drawRect(rect, lower);
 
-    if (ambientStage >= 2 || interactionEnergy > 0.18 || memoryPresence > 0.02) {
-      final Paint edgeGlow = Paint()
+    // エッジ密度（ほぼ感じないレベル）
+    if (ambientStage >= 2 || interactionEnergy > 0.15 || memoryPresence > 0.02) {
+      final Paint edge = Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: <Color>[
+          colors: [
             Colors.white.withValues(
-              alpha: 0.015 + (interactionEnergy * 0.022) + (memoryBoost * 0.08),
+              alpha: 0.008 +
+                  (interactionEnergy * 0.01) +
+                  (memoryBoost * 0.05),
             ),
             Colors.transparent,
             Colors.white.withValues(
-              alpha: 0.022 + (ambientStage * 0.01) + (memoryBoost * 0.12),
+              alpha: 0.01 +
+                  (ambientStage * 0.006) +
+                  (memoryBoost * 0.06),
             ),
           ],
         ).createShader(rect);
 
-      canvas.drawRect(rect, edgeGlow);
+      canvas.drawRect(rect, edge);
     }
 
+    // memory: active（ほぼ見えない脈動）
     if (memoryType == 'active') {
-      final Paint memoryPulse = Paint()
+      final Paint pulse = Paint()
         ..shader = RadialGradient(
-          center: Alignment(
-            ((px * 2) - 1) * 0.2,
-            ((py * 2) - 1) * 0.15,
-          ),
-          radius: 0.34 +
-              (sin(presenceSeconds * 1.6) * 0.02) +
-              (memoryBoost * 0.32),
-          colors: <Color>[
-            Colors.white.withValues(alpha: 0.02 + memoryBoost * 0.2),
+          center: center,
+          radius: 0.28 +
+              (sin(presenceSeconds * 1.4) * 0.015) +
+              (memoryBoost * 0.2),
+          colors: [
+            Colors.white.withValues(alpha: 0.01 + memoryBoost * 0.12),
             Colors.transparent,
           ],
         ).createShader(rect);
 
-      canvas.drawRect(rect, memoryPulse);
+      canvas.drawRect(rect, pulse);
     }
 
+    // memory: still（静かな膜）
     if (memoryType == 'still') {
-      final Paint stillVeil = Paint()
+      final Paint veil = Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: <Color>[
-            Colors.white.withValues(alpha: 0.01 + memoryBoost * 0.09),
+          colors: [
+            Colors.white.withValues(alpha: 0.006 + memoryBoost * 0.05),
             Colors.transparent,
-            Colors.white.withValues(alpha: 0.015 + memoryBoost * 0.11),
+            Colors.white.withValues(alpha: 0.008 + memoryBoost * 0.06),
           ],
-          stops: const <double>[0.0, 0.52, 1.0],
         ).createShader(rect);
 
-      canvas.drawRect(rect, stillVeil);
+      canvas.drawRect(rect, veil);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _ZeronGlowPainter oldDelegate) {
-    return oldDelegate.presenceSeconds != presenceSeconds ||
-        oldDelegate.ambientStage != ambientStage ||
-        oldDelegate.interactionEnergy != interactionEnergy ||
-        oldDelegate.pointerPosition != pointerPosition ||
-        oldDelegate.memoryPresence != memoryPresence ||
-        oldDelegate.memoryType != memoryType;
+  bool shouldRepaint(covariant _ZeronGlowPainter old) {
+    return true;
   }
 }
