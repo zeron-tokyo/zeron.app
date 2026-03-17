@@ -48,105 +48,92 @@ class _ZeronNoisePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
+    final Rect rect = Offset.zero & size;
 
-    final double flicker =
-        ((sin(presenceSeconds * 12.0) + cos(presenceSeconds * 17.0)) * 0.5 + 1) /
-            2;
+    final double stageBoost = ambientStage * 0.004;
+    final double interactionBoost = interactionEnergy * 0.012;
+    final double pointerBoost = isPointerInside ? 0.004 : 0.0;
+    final double shimmer = ((sin(presenceSeconds * 0.7) + 1) * 0.5) * 0.004;
 
-    final double noiseOpacity = (0.018 +
-        (ambientStage * 0.010) +
-        (interactionEnergy * 0.040) +
-        (isPointerInside ? 0.006 : 0.0))
-        .clamp(0.0, 0.12);
+    final Paint vignettePaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 1.08,
+        colors: <Color>[
+          Colors.transparent,
+          Colors.black.withValues(alpha: 0.06 + stageBoost),
+          Colors.black.withValues(
+            alpha: 0.18 + stageBoost + interactionBoost * 0.5,
+          ),
+        ],
+        stops: const <double>[0.0, 0.74, 1.0],
+      ).createShader(rect);
 
-    // --- 超薄スキャンライン（ほぼ見えない）
-    final paintLine = Paint()..style = PaintingStyle.stroke;
-    final double gap = max(2.5, 4.5 - (ambientStage * 0.3));
+    canvas.drawRect(rect, vignettePaint);
 
-    for (double y = 0; y < size.height; y += gap) {
-      final double alpha =
-          noiseOpacity * (0.18 + (((y / gap) + flicker) % 3) * 0.05);
+    final double hazeHeight = 84 + (ambientStage * 10);
+    final double hazeY =
+        size.height * (0.35 + sin(presenceSeconds * 0.22) * 0.03);
 
-      paintLine
-        ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: alpha);
+    final Paint hazePaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: <Color>[
+          Colors.transparent,
+          Colors.white.withValues(
+            alpha: 0.007 + shimmer + pointerBoost * 0.4,
+          ),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromLTWH(0, hazeY, size.width, hazeHeight),
+      );
 
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paintLine);
-    }
+    canvas.drawRect(
+      Rect.fromLTWH(0, hazeY, size.width, hazeHeight),
+      hazePaint,
+    );
 
-    // --- 超微粒グレイン（主張を抑える）
-    final random =
-        Random((presenceSeconds * 900).floor() + ambientStage * 13);
+    final Random random =
+        Random((presenceSeconds * 60).floor() + ambientStage * 97);
 
-    final paintGrain = Paint()..style = PaintingStyle.fill;
-
-    final int grainCount =
-        140 + (ambientStage * 50) + (interactionEnergy * 120).toInt();
+    final Paint grainPaint = Paint()..style = PaintingStyle.fill;
+    final int grainCount = 34 +
+        (ambientStage * 8) +
+        (interactionEnergy * 18).round() +
+        (isPointerInside ? 6 : 0);
 
     for (int i = 0; i < grainCount; i++) {
       final double x = random.nextDouble() * size.width;
       final double y = random.nextDouble() * size.height;
+      final double s = 0.55 + random.nextDouble() * 0.75;
 
-      final double s = 0.5 + random.nextDouble() * 1.6;
-
-      final double density =
-          0.9 + (sin((y / size.height) * pi) * 0.3);
-
-      paintGrain.color = Colors.white.withValues(
-        alpha: noiseOpacity *
-            (0.08 + random.nextDouble() * 0.5) *
-            density,
+      grainPaint.color = Colors.white.withValues(
+        alpha: (0.012 +
+                random.nextDouble() * 0.018 +
+                stageBoost * 0.4 +
+                interactionBoost * 0.35)
+            .clamp(0.0, 0.03),
       );
 
-      canvas.drawRect(Rect.fromLTWH(x, y, s, s), paintGrain);
+      canvas.drawRect(Rect.fromLTWH(x, y, s, s), grainPaint);
     }
 
-    // --- ビネット（空間締め）
-    final vignette = Paint()
-      ..shader = RadialGradient(
-        center: Alignment.center,
-        radius: 1.1,
-        colors: [
-          Colors.transparent,
-          Colors.black.withValues(alpha: 0.06 + ambientStage * 0.025),
-          Colors.black.withValues(alpha: 0.18 + ambientStage * 0.05),
-        ],
-        stops: const [0.0, 0.75, 1.0],
-      ).createShader(rect);
+    final double lineAlpha =
+        (0.006 + stageBoost * 0.4 + pointerBoost * 0.4).clamp(0.0, 0.012);
 
-    canvas.drawRect(rect, vignette);
+    final Paint linePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = Colors.white.withValues(alpha: lineAlpha);
 
-    // --- 横方向の“気配”（かなり弱く）
-    final double hazeY =
-        size.height * (0.32 + (sin(presenceSeconds * 0.4) * 0.06));
-
-    final double haze =
-        0.008 + (interactionEnergy * 0.015) + (ambientStage * 0.006);
-
-    final hazePaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        colors: [
-          Colors.transparent,
-          Colors.white.withValues(alpha: haze),
-          Colors.transparent,
-        ],
-      ).createShader(
-        Rect.fromLTWH(
-          0,
-          hazeY,
-          size.width,
-          100 + ambientStage * 18,
-        ),
-      );
-
-    canvas.drawRect(rect, hazePaint);
+    final double gap = 22 + ambientStage * 2.0;
+    for (double y = 10; y < size.height; y += gap) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _ZeronNoisePainter old) {
-    return true;
-  }
+  bool shouldRepaint(covariant _ZeronNoisePainter oldDelegate) => true;
 }

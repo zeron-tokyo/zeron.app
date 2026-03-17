@@ -22,13 +22,13 @@ class ZeronBackground extends StatefulWidget {
 class _ZeronBackgroundState extends State<ZeronBackground>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  final List<_Particle> _particles = <_Particle>[];
   final Random _random = Random();
+  final List<_Particle> _particles = <_Particle>[];
 
   Size _lastSize = Size.zero;
 
-  static const int _baseParticleCount = 90;
-  static const int _maxAdditionalParticles = 50;
+  static const int _baseParticleCount = 58;
+  static const int _maxAdditionalParticles = 18;
 
   @override
   void initState() {
@@ -38,60 +38,41 @@ class _ZeronBackgroundState extends State<ZeronBackground>
       vsync: this,
       duration: const Duration(days: 1),
     )
-      ..addListener(_updateParticles)
+      ..addListener(_tick)
       ..forward();
 
-    _generateParticles();
+    _generateInitialParticles();
   }
 
-  void _generateParticles() {
+  void _generateInitialParticles() {
     if (_particles.isNotEmpty) return;
 
-    final int total =
-        _baseParticleCount + (widget.ambientStage * 8);
-
+    final int total = _targetParticleCount();
     for (int i = 0; i < total; i++) {
       _particles.add(_Particle.random(_random));
     }
   }
 
-  void _syncParticleCount() {
-    final int targetCount = (_baseParticleCount +
-            (widget.ambientStage * 8) +
+  int _targetParticleCount() {
+    return (_baseParticleCount +
+            (widget.ambientStage * 4) +
             (widget.interactionEnergy * _maxAdditionalParticles).round())
         .clamp(_baseParticleCount, _baseParticleCount + _maxAdditionalParticles);
-
-    if (_particles.length < targetCount) {
-      final int addCount = targetCount - _particles.length;
-      for (int i = 0; i < addCount; i++) {
-        _particles.add(_Particle.random(_random));
-      }
-    } else if (_particles.length > targetCount) {
-      _particles.removeRange(targetCount, _particles.length);
-    }
   }
 
-  void _updateParticles() {
-    _syncParticleCount();
+  void _syncParticleCount() {
+    final int target = _targetParticleCount();
 
-    final Offset pointer = _normalizedPointer();
-
-    final double drift = sin(widget.presenceSeconds * 0.10) * 0.5 + 0.5;
-    final double breath = sin(widget.presenceSeconds * 0.22) * 0.5 + 0.5;
-    final double stageEnergy = (widget.ambientStage / 3.0).clamp(0.0, 1.0);
-
-    for (final _Particle p in _particles) {
-      p.update(
-        pointer: pointer,
-        drift: drift,
-        breath: breath,
-        interactionEnergy: widget.interactionEnergy,
-        stageEnergy: stageEnergy,
-        presenceSeconds: widget.presenceSeconds,
-      );
+    if (_particles.length < target) {
+      for (int i = 0; i < target - _particles.length; i++) {
+        _particles.add(_Particle.random(_random));
+      }
+      return;
     }
 
-    if (mounted) setState(() {});
+    if (_particles.length > target) {
+      _particles.removeRange(target, _particles.length);
+    }
   }
 
   Offset _normalizedPointer() {
@@ -105,20 +86,41 @@ class _ZeronBackgroundState extends State<ZeronBackground>
     );
   }
 
+  void _tick() {
+    _syncParticleCount();
+
+    final Offset pointer = _normalizedPointer();
+    final double stageEnergy = (widget.ambientStage / 3.0).clamp(0.0, 1.0);
+    final double time = widget.presenceSeconds;
+
+    for (final _Particle particle in _particles) {
+      particle.update(
+        pointer: pointer,
+        interactionEnergy: widget.interactionEnergy,
+        stageEnergy: stageEnergy,
+        time: time,
+      );
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-      builder: (context, constraints) {
+      builder: (BuildContext context, BoxConstraints constraints) {
         _lastSize = Size(constraints.maxWidth, constraints.maxHeight);
 
         return CustomPaint(
+          size: Size.infinite,
           painter: _BackgroundPainter(
             particles: _particles,
             presenceSeconds: widget.presenceSeconds,
             ambientStage: widget.ambientStage,
             interactionEnergy: widget.interactionEnergy,
           ),
-          size: Size.infinite,
         );
       },
     );
@@ -135,86 +137,76 @@ class _Particle {
   _Particle({
     required this.x,
     required this.y,
-    required this.vx,
-    required this.vy,
+    required this.baseSpeed,
+    required this.depth,
     required this.size,
     required this.opacity,
-    required this.depth,
     required this.seed,
+    required this.driftSeed,
   });
 
   double x;
   double y;
-  double vx;
-  double vy;
+  double baseSpeed;
+  double depth;
   double size;
   double opacity;
-  double depth;
   double seed;
+  double driftSeed;
 
-  factory _Particle.random(Random r) {
+  factory _Particle.random(Random random) {
     return _Particle(
-      x: r.nextDouble(),
-      y: r.nextDouble(),
-      vx: (r.nextDouble() - 0.5) * 0.0012,
-      vy: (r.nextDouble() - 0.5) * 0.0012,
-      size: 0.5 + (r.nextDouble() * 2.2),
-      opacity: 0.06 + (r.nextDouble() * 0.22),
-      depth: 0.4 + (r.nextDouble() * 0.8),
-      seed: r.nextDouble() * pi * 2,
+      x: random.nextDouble(),
+      y: random.nextDouble() * 1.2 - 0.1,
+      baseSpeed: 0.00016 + (random.nextDouble() * 0.00034),
+      depth: 0.45 + (random.nextDouble() * 1.5),
+      size: 0.55 + (random.nextDouble() * 1.8),
+      opacity: 0.045 + (random.nextDouble() * 0.14),
+      seed: random.nextDouble() * pi * 2,
+      driftSeed: random.nextDouble() * pi * 2,
     );
   }
 
   void update({
     required Offset pointer,
-    required double drift,
-    required double breath,
     required double interactionEnergy,
     required double stageEnergy,
-    required double presenceSeconds,
+    required double time,
   }) {
-    final double flowX =
-        sin((y * 6.0) + (presenceSeconds * 0.08) + seed) *
-            0.00015 *
-            (0.6 + depth);
+    final double verticalSpeed =
+        baseSpeed * (0.88 + depth * 0.72) * (1.0 + stageEnergy * 0.18);
 
-    final double flowY =
-        cos((x * 5.0) - (presenceSeconds * 0.07) + seed) *
-            0.00012 *
-            (0.6 + depth);
+    y += verticalSpeed;
 
-    vx += flowX;
-    vy += flowY;
+    final double stream =
+        sin((time * 0.12) + driftSeed + (y * 4.0)) * 0.00012 * depth;
 
-    vx += (drift - 0.5) * 0.00008 * depth;
-    vy += (breath - 0.5) * 0.00005 * depth;
+    final double orbital =
+        cos((time * 0.08) + seed + (y * 2.8)) * 0.00005 * (0.6 + depth);
 
-    final dx = x - pointer.dx;
-    final dy = y - pointer.dy;
-    final dist = sqrt(dx * dx + dy * dy);
+    x += stream + orbital;
 
-    if (dist < 0.18) {
-      final force =
-          (0.18 - dist) * (0.0006 + interactionEnergy * 0.0012);
-      vx += dx * force * depth;
-      vy += dy * force * depth;
+    final double dx = x - pointer.dx;
+    final double dy = y - pointer.dy;
+    final double distance = sqrt((dx * dx) + (dy * dy));
+
+    if (distance < 0.16) {
+      final double influence = (0.16 - distance) *
+          (0.00055 + interactionEnergy * 0.0009) *
+          (0.7 + depth * 0.4);
+
+      x += dx * influence;
+      y += dy * influence * 0.45;
     }
 
-    final limit =
-        0.0016 + (interactionEnergy * 0.0025) + (stageEnergy * 0.001);
-    vx = vx.clamp(-limit, limit);
-    vy = vy.clamp(-limit, limit);
+    if (x < -0.08) x = 1.08;
+    if (x > 1.08) x = -0.08;
 
-    x += vx;
-    y += vy;
-
-    vx *= 0.994;
-    vy *= 0.994;
-
-    if (x < -0.05) x = 1.05;
-    if (x > 1.05) x = -0.05;
-    if (y < -0.05) y = 1.05;
-    if (y > 1.05) y = -0.05;
+    if (y > 1.08) {
+      y = -0.10;
+      x = (x + 0.08 + sin(seed + time * 0.03) * 0.06) % 1.0;
+      if (x < 0) x += 1.0;
+    }
   }
 }
 
@@ -233,34 +225,39 @@ class _BackgroundPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
+    final Paint paint = Paint()..style = PaintingStyle.fill;
 
-    final double breath = sin(presenceSeconds * 0.18) * 0.5 + 0.5;
-    final double stageBoost = ambientStage * 0.03;
+    final double breath = (sin(presenceSeconds * 0.18) + 1) * 0.5;
+    final double stageBoost = ambientStage * 0.012;
 
-    for (final p in particles) {
-      final double pulse =
-          sin((presenceSeconds * (0.4 + p.depth * 0.2)) + p.seed) *
-                  0.5 +
-              0.5;
+    for (final _Particle particle in particles) {
+      final double pulse = (sin(
+                (presenceSeconds * (0.28 + particle.depth * 0.12)) +
+                    particle.seed,
+              ) +
+              1) *
+          0.5;
 
-      final double opacity = (p.opacity +
-              (pulse * 0.05) +
-              (breath * 0.04) +
-              (interactionEnergy * 0.10) +
+      final double opacity = (particle.opacity +
+              (pulse * 0.035) +
+              (breath * 0.018) +
+              (interactionEnergy * 0.05) +
               stageBoost)
-          .clamp(0.03, 0.45);
+          .clamp(0.025, 0.22);
 
-      final double radius = (p.size +
-              (pulse * 0.4) +
-              (interactionEnergy * 0.5) +
-              (ambientStage * 0.1))
-          .clamp(0.3, 3.8);
+      final double radius = (particle.size *
+              (0.8 + particle.depth * 0.58) +
+              (pulse * 0.28) +
+              (interactionEnergy * 0.22))
+          .clamp(0.45, 3.2);
 
       paint.color = Colors.white.withValues(alpha: opacity);
 
       canvas.drawCircle(
-        Offset(p.x * size.width, p.y * size.height),
+        Offset(
+          particle.x * size.width,
+          particle.y * size.height,
+        ),
         radius,
         paint,
       );
@@ -268,7 +265,5 @@ class _BackgroundPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _BackgroundPainter old) {
-    return true;
-  }
+  bool shouldRepaint(covariant _BackgroundPainter oldDelegate) => true;
 }

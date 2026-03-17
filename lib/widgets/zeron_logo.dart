@@ -16,43 +16,58 @@ class ZeronLogo extends StatefulWidget {
 class _ZeronLogoState extends State<ZeronLogo>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _scale;
-  late final Animation<double> _opacity;
-  late final Animation<double> _glow;
-  late final Animation<double> _float;
+  late Animation<double> _scale;
+  late Animation<double> _opacity;
+  late Animation<double> _glow;
+  late Animation<double> _coreGlow;
 
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(vsync: this);
+    _configureAnimations();
+    _controller.repeat(reverse: true);
+  }
 
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: widget.isIdle ? 5200 : 3200),
-    )..repeat(reverse: true);
+  @override
+  void didUpdateWidget(covariant ZeronLogo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isIdle != widget.isIdle) {
+      _configureAnimations();
+      _controller
+        ..reset()
+        ..repeat(reverse: true);
+    }
+  }
 
-    final curved = CurvedAnimation(
+  void _configureAnimations() {
+    final int durationMs = widget.isIdle ? 5600 : 4200;
+
+    _controller.duration = Duration(milliseconds: durationMs);
+
+    final CurvedAnimation curved = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeInOut,
+      curve: Curves.easeInOutCubic,
     );
 
     _scale = Tween<double>(
-      begin: widget.isIdle ? 0.996 : 0.99,
-      end: widget.isIdle ? 1.004 : 1.015,
+      begin: widget.isIdle ? 0.986 : 0.978,
+      end: widget.isIdle ? 1.014 : 1.026,
     ).animate(curved);
 
     _opacity = Tween<double>(
-      begin: widget.isIdle ? 0.92 : 0.86,
+      begin: widget.isIdle ? 0.93 : 0.89,
       end: 1.0,
     ).animate(curved);
 
     _glow = Tween<double>(
-      begin: widget.isIdle ? 0.06 : 0.10,
-      end: widget.isIdle ? 0.12 : 0.18,
+      begin: widget.isIdle ? 0.085 : 0.11,
+      end: widget.isIdle ? 0.17 : 0.24,
     ).animate(curved);
 
-    _float = Tween<double>(
-      begin: widget.isIdle ? 1.0 : 1.6,
-      end: widget.isIdle ? -1.0 : -1.6,
+    _coreGlow = Tween<double>(
+      begin: widget.isIdle ? 0.14 : 0.18,
+      end: widget.isIdle ? 0.26 : 0.34,
     ).animate(curved);
   }
 
@@ -62,76 +77,84 @@ class _ZeronLogoState extends State<ZeronLogo>
     super.dispose();
   }
 
-  double _logoSize(double w) {
-    if (w >= 1400) return 200;
-    if (w >= 1000) return 170;
-    if (w >= 700) return 140;
-    return w * 0.32;
+  double _logoSize(double width) {
+    if (width >= 1600) return 214;
+    if (width >= 1300) return 192;
+    if (width >= 1000) return 172;
+    if (width >= 700) return 144;
+    return width * 0.34;
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = _logoSize(MediaQuery.of(context).size.width);
+    final double size = _logoSize(MediaQuery.of(context).size.width);
 
     return AnimatedBuilder(
       animation: _controller,
-      builder: (context, _) {
+      builder: (BuildContext context, Widget? child) {
         return Opacity(
           opacity: _opacity.value,
-          child: Transform.translate(
-            offset: Offset(0, _float.value),
-            child: Transform.scale(
-              scale: _scale.value,
-              child: SizedBox(
-                width: size,
-                height: size,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // 外側の薄い拡散光（超弱）
-                    Opacity(
-                      opacity: _glow.value * 0.6,
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: 36,
-                          sigmaY: 36,
-                        ),
-                        child: Image.asset(
-                          'assets/brand/zeron_symbol_white.png',
-                          width: size * 1.05,
-                          height: size * 1.05,
-                          fit: BoxFit.contain,
-                        ),
+          child: Transform.scale(
+            scale: _scale.value,
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Stack(
+                alignment: Alignment.center,
+                children: <Widget>[
+                  Opacity(
+                    opacity: _glow.value * 0.42,
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(
+                        sigmaX: widget.isIdle ? 34 : 40,
+                        sigmaY: widget.isIdle ? 34 : 40,
+                      ),
+                      child: Image.asset(
+                        'assets/brand/zeron_symbol_white.png',
+                        width: size * 1.16,
+                        height: size * 1.16,
+                        fit: BoxFit.contain,
                       ),
                     ),
-
-                    // 内側のコア発光（軽め）
-                    Opacity(
-                      opacity: _glow.value,
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: 16,
-                          sigmaY: 16,
-                        ),
-                        child: Image.asset(
-                          'assets/brand/zeron_symbol_white.png',
-                          width: size * 0.94,
-                          height: size * 0.94,
-                          fit: BoxFit.contain,
-                        ),
+                  ),
+                  Opacity(
+                    opacity: _glow.value,
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(
+                        sigmaX: widget.isIdle ? 18 : 22,
+                        sigmaY: widget.isIdle ? 18 : 22,
+                      ),
+                      child: Image.asset(
+                        'assets/brand/zeron_symbol_white.png',
+                        width: size * 1.03,
+                        height: size * 1.03,
+                        fit: BoxFit.contain,
                       ),
                     ),
-
-                    // 本体（シャープ）
-                    Image.asset(
-                      'assets/brand/zeron_symbol_white.png',
-                      width: size,
-                      height: size,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.high,
+                  ),
+                  Opacity(
+                    opacity: _coreGlow.value,
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(
+                        sigmaX: 8,
+                        sigmaY: 8,
+                      ),
+                      child: Image.asset(
+                        'assets/brand/zeron_symbol_white.png',
+                        width: size * 0.95,
+                        height: size * 0.95,
+                        fit: BoxFit.contain,
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  Image.asset(
+                    'assets/brand/zeron_symbol_white.png',
+                    width: size,
+                    height: size,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ],
               ),
             ),
           ),
