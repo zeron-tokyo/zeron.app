@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 class ZeronDistortion extends StatelessWidget {
@@ -49,80 +48,83 @@ class _DistortionPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()..style = PaintingStyle.fill;
+    final paint = Paint()..style = PaintingStyle.fill;
 
     final double pointerY =
-    size.height == 0 ? 0.5 : (pointerPosition.dy / size.height).clamp(0.0, 1.0);
+        size.height == 0 ? 0.5 : (pointerPosition.dy / size.height).clamp(0.0, 1.0);
 
-    final int bandCount = 4 + ambientStage;
+    // --- 横方向の“空間の歪み”（かなり弱く）
+    final int bandCount = 3 + ambientStage;
 
     for (int i = 0; i < bandCount; i++) {
       final double progress = i / max(1, bandCount - 1);
 
-      final double travelSpeed = 0.18 + (i * 0.08);
+      final double speed = 0.12 + (i * 0.05);
 
-      final double bandHeight =
-          26 + (ambientStage * 6) + (interactionEnergy * 22);
+      final double height =
+          22 + (ambientStage * 5) + (interactionEnergy * 16);
 
       final double centerY = size.height *
-          (0.18 +
-              progress * 0.64 +
-              (sin((presenceSeconds * travelSpeed) + i) * 0.065) +
-              ((pointerY - 0.5) * 0.11));
+          (0.22 +
+              progress * 0.56 +
+              (sin((presenceSeconds * speed) + i) * 0.05) +
+              ((pointerY - 0.5) * 0.08));
 
-      final double dx = sin((presenceSeconds * (1.4 + i * 0.22)) + i) *
-          (9 + ambientStage * 3.5) +
-          (interactionEnergy * 26);
+      final double dx =
+          sin((presenceSeconds * (1.0 + i * 0.18)) + i) *
+              (6 + ambientStage * 2.2) +
+          (interactionEnergy * 14);
 
-      final Rect bandRect = Rect.fromLTWH(
+      final Rect rect = Rect.fromLTWH(
         dx,
         centerY,
         size.width,
-        bandHeight,
+        height,
       );
 
       paint.shader = LinearGradient(
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
-        colors: <Color>[
+        colors: [
           Colors.transparent,
           Colors.white.withValues(
-            alpha: (0.016 +
-                (ambientStage * 0.011) +
-                (interactionEnergy * 0.022))
-                .clamp(0.0, 0.09),
+            alpha: (0.010 +
+                    (ambientStage * 0.008) +
+                    (interactionEnergy * 0.015))
+                .clamp(0.0, 0.05),
           ),
           Colors.transparent,
         ],
-      ).createShader(bandRect);
+      ).createShader(rect);
 
-      canvas.drawRect(bandRect, paint);
+      canvas.drawRect(rect, paint);
     }
 
-    if (ambientStage >= 1 || interactionEnergy > 0.05) {
-      final int lineCount = 12 + ambientStage * 7;
+    // --- 微細なライン歪み（感じるレベル）
+    if (ambientStage >= 1 || interactionEnergy > 0.04) {
+      final int lineCount = 8 + ambientStage * 5;
 
-      final Paint linePaint = Paint()
+      final linePaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
 
       for (int i = 0; i < lineCount; i++) {
         final double y = size.height *
-            ((i + 1) / (lineCount + 1)) +
-            sin((presenceSeconds * 1.0) + i) *
-                (2.4 + ambientStage.toDouble());
+                ((i + 1) / (lineCount + 1)) +
+            sin((presenceSeconds * 0.8) + i) *
+                (1.8 + ambientStage.toDouble());
 
-        final double shift = sin((presenceSeconds * 2.6) + i * 0.75) *
-            (7 + ambientStage * 3.5 + interactionEnergy * 14);
+        final double shift =
+            sin((presenceSeconds * 2.0) + i * 0.6) *
+                (4 + ambientStage * 2.2 + interactionEnergy * 8);
 
-        final double alpha = (0.02 +
-            (ambientStage * 0.007) +
-            (interactionEnergy * 0.02) +
-            (i.isEven ? 0.005 : 0.0))
-            .clamp(0.0, 0.08);
+        final double alpha = (0.012 +
+                (ambientStage * 0.005) +
+                (interactionEnergy * 0.012))
+            .clamp(0.0, 0.05);
 
         linePaint
-          ..strokeWidth = 0.7 + (i % 3) * 0.25
+          ..strokeWidth = 0.6
           ..color = Colors.white.withValues(alpha: alpha);
 
         canvas.drawLine(
@@ -133,32 +135,28 @@ class _DistortionPainter extends CustomPainter {
       }
     }
 
+    // --- 空間の“膜”（ほぼ感じないレベル）
     if (ambientStage >= 2) {
-      final Rect veilRect = Offset.zero & size;
+      final Rect rect = Offset.zero & size;
 
-      final Paint veilPaint = Paint()
+      final paintVeil = Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: <Color>[
-            Colors.white.withValues(
-                alpha: 0.01 + interactionEnergy * 0.012),
+          colors: [
+            Colors.white.withValues(alpha: 0.006 + interactionEnergy * 0.008),
             Colors.transparent,
-            Colors.white.withValues(
-                alpha: 0.014 + ambientStage * 0.007),
+            Colors.white.withValues(alpha: 0.008 + ambientStage * 0.005),
           ],
-          stops: const <double>[0.0, 0.5, 1.0],
-        ).createShader(veilRect);
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(rect);
 
-      canvas.drawRect(veilRect, veilPaint);
+      canvas.drawRect(rect, paintVeil);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _DistortionPainter oldDelegate) {
-    return oldDelegate.presenceSeconds != presenceSeconds ||
-        oldDelegate.ambientStage != ambientStage ||
-        oldDelegate.interactionEnergy != interactionEnergy ||
-        oldDelegate.pointerPosition != pointerPosition;
+  bool shouldRepaint(covariant _DistortionPainter old) {
+    return true;
   }
 }
