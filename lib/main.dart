@@ -1,7 +1,25 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:zeron/app/zeron_app.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ZeronApp());
+
+  // グローバルエラーハンドリング
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    return true;
+  };
+
+  runZonedGuarded(
+    () {
+      runApp(const ZeronApp());
+    },
+    (error, stack) {},
+  );
 }
