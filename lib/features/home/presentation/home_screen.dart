@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zeron/widgets/zeron_background.dart';
 import 'package:zeron/widgets/zeron_distortion.dart';
 import 'package:zeron/widgets/zeron_glow.dart';
@@ -19,367 +18,96 @@ class ZeronHomeScreen extends StatefulWidget {
 
 class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     with WidgetsBindingObserver {
-  static const Duration _tickRate = Duration(milliseconds: 100);
-
-  static const String _keyTotalSessions = 'zeron_total_sessions';
-  static const String _keyTotalPresenceSeconds = 'zeron_total_presence_seconds';
-  static const String _keyLastSessionType = 'zeron_last_session_type';
-  static const String _keyMemoryImprint = 'zeron_memory_imprint';
-  static const String _keyLastVisitAt = 'zeron_last_visit_at';
-  static const String _keyMaxAmbientStage = 'zeron_max_ambient_stage';
-
-  final Random _random = Random();
+  static const Duration _tickRate = Duration(milliseconds: 40);
 
   Timer? _ticker;
-  SharedPreferences? _prefs;
 
   Duration _presence = Duration.zero;
+  Duration _timeSinceInteraction = Duration.zero;
 
   int _ambientStage = 0;
-  int _interactionCount = 0;
-
   double _interactionEnergy = 0.0;
-  double _ambientBreath = 0.0;
-  double _ambientDrift = 0.0;
-  double _ambientPulse = 0.0;
-  double _peakInteractionEnergy = 0.0;
-
-  bool _isPointerInside = false;
-  bool _isIdle = false;
-  bool _isMemoryLoaded = false;
-  bool _hasSavedSessionSummary = false;
-  bool _hasTriggeredPersistentMemory = false;
-  bool _isSavingSessionSummary = false;
 
   Offset _pointerPosition = Offset.zero;
   Offset _pointerTarget = Offset.zero;
 
-  String? _presenceMessage;
-  DateTime? _presenceMessageUntil;
+  bool _isPointerInside = false;
+  bool _didBoot = false;
+  bool _isIdle = false;
+  bool _appActive = true;
 
-  String? _ambientEventMessage;
-  DateTime? _ambientEventUntil;
-  Duration? _nextAmbientEventAt;
-
-  bool _hasShown20s = false;
-  bool _hasShown45s = false;
-  bool _hasShown90s = false;
-  bool _hasShown150s = false;
-
-  int _storedTotalSessions = 0;
-  int _storedTotalPresenceSeconds = 0;
-  int _storedMaxAmbientStage = 0;
-  String _storedLastSessionType = 'none';
-  String _storedMemoryImprint = 'none';
-  String _storedLastVisitAt = '';
+  double _ambientBreath = 0.0;
+  double _ambientDrift = 0.0;
+  double _ambientPulse = 0.0;
 
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addObserver(this);
-    _scheduleNextAmbientEvent();
-    _loadMemoryLayer();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _didBoot = true;
+      });
+    });
+
     _ticker = Timer.periodic(_tickRate, _onTick);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _saveSessionSummary();
     _ticker?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.detached) {
-      _saveSessionSummary();
-    }
-  }
-
-  Future<void> _loadMemoryLayer() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    final int totalSessions = prefs.getInt(_keyTotalSessions) ?? 0;
-    final int totalPresenceSeconds =
-        prefs.getInt(_keyTotalPresenceSeconds) ?? 0;
-    final int maxAmbientStage = prefs.getInt(_keyMaxAmbientStage) ?? 0;
-    final String lastSessionType =
-        prefs.getString(_keyLastSessionType) ?? 'none';
-    final String memoryImprint = prefs.getString(_keyMemoryImprint) ?? 'none';
-    final String lastVisitAt = prefs.getString(_keyLastVisitAt) ?? '';
-
-    await prefs.setInt(_keyTotalSessions, totalSessions + 1);
-    await prefs.setString(_keyLastVisitAt, DateTime.now().toIso8601String());
-
-    _prefs = prefs;
-
-    if (!mounted) return;
-
-    setState(() {
-      _storedTotalSessions = totalSessions;
-      _storedTotalPresenceSeconds = totalPresenceSeconds;
-      _storedMaxAmbientStage = maxAmbientStage;
-      _storedLastSessionType = lastSessionType;
-      _storedMemoryImprint = memoryImprint;
-      _storedLastVisitAt = lastVisitAt;
-      _isMemoryLoaded = true;
-    });
-
-    _showInitialMemoryHintIfNeeded();
-  }
-
-  void _showInitialMemoryHintIfNeeded() {
-    if (!_isMemoryLoaded) return;
-    if (_storedTotalSessions <= 0) return;
-
-    String message;
-
-    if (_storedMemoryImprint == 'active') {
-      message = 'it remembers your movement';
-    } else if (_storedMemoryImprint == 'still') {
-      message = 'it remembers your stillness';
-    } else if (_storedTotalSessions >= 3) {
-      message = 'you have been here before';
-    } else {
-      message = 'this place feels familiar';
-    }
-
-    _presenceMessage = message;
-    _presenceMessageUntil = DateTime.now().add(
-      const Duration(milliseconds: 2600),
-    );
-
-    if (mounted) {
-      setState(() {});
-    }
+    _appActive = state == AppLifecycleState.resumed;
   }
 
   void _onTick(Timer timer) {
-    if (!mounted) return;
-
-    final double deltaSeconds = _tickRate.inMilliseconds / 1000.0;
+    if (!mounted || !_appActive) return;
 
     _presence += _tickRate;
+    _timeSinceInteraction += _tickRate;
 
     final double t = _presence.inMilliseconds / 1000.0;
+    final double deltaSeconds = _tickRate.inMilliseconds / 1000.0;
 
-    _ambientBreath = (sin(t * 0.35) + 1) * 0.5;
-    _ambientDrift = (sin(t * 0.12) + 1) * 0.5;
-    _ambientPulse = (sin(t * 1.8) + 1) * 0.5;
+    _ambientBreath = (sin(t * 0.34) + 1.0) * 0.5;
+    _ambientDrift = (sin(t * 0.11) + 1.0) * 0.5;
+    _ambientPulse = (sin(t * 1.65) + 1.0) * 0.5;
 
     _interactionEnergy =
-        (_interactionEnergy - (0.015 * deltaSeconds)).clamp(0.0, 1.0);
+        (_interactionEnergy - (0.42 * deltaSeconds)).clamp(0.0, 1.0);
 
     _pointerPosition =
-        Offset.lerp(_pointerPosition, _pointerTarget, 0.08) ?? _pointerPosition;
+        Offset.lerp(_pointerPosition, _pointerTarget, 0.075) ?? _pointerPosition;
 
-    _updateAmbientStage();
-    _handlePresenceMilestones();
-    _handleAmbientEvent();
-    _handlePersistentMemoryMoment();
-
-    _isIdle = _interactionEnergy < 0.02 && _presence.inSeconds > 6;
-
-    if (_presenceMessageUntil != null &&
-        DateTime.now().isAfter(_presenceMessageUntil!)) {
-      _presenceMessage = null;
-      _presenceMessageUntil = null;
-    }
-
-    if (_ambientEventUntil != null &&
-        DateTime.now().isAfter(_ambientEventUntil!)) {
-      _ambientEventMessage = null;
-      _ambientEventUntil = null;
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _updateAmbientStage() {
     final int seconds = _presence.inSeconds;
-
-    if (seconds >= 180) {
-      _ambientStage = 3;
-    } else if (seconds >= 120) {
-      _ambientStage = 2;
-    } else if (seconds >= 60) {
-      _ambientStage = 1;
-    } else {
+    if (seconds < 45) {
       _ambientStage = 0;
+    } else if (seconds < 120) {
+      _ambientStage = 1;
+    } else if (seconds < 240) {
+      _ambientStage = 2;
+    } else {
+      _ambientStage = 3;
     }
+
+    _isIdle = _timeSinceInteraction.inMilliseconds > 3800 &&
+        _interactionEnergy < 0.035 &&
+        _presence.inSeconds > 5;
+
+    setState(() {});
   }
 
-  void _handlePresenceMilestones() {
-    final int seconds = _presence.inSeconds;
-
-    if (!_hasShown20s && seconds >= 20) {
-      _hasShown20s = true;
-      _showPresenceMessage(
-        _storedTotalSessions > 0 ? 'it noticed you again' : 'it noticed you',
-      );
-      return;
-    }
-
-    if (!_hasShown45s && seconds >= 45) {
-      _hasShown45s = true;
-      _showPresenceMessage(
-        _storedMemoryImprint == 'active'
-            ? 'it expects movement from you'
-            : 'you have been here for a while',
-      );
-      return;
-    }
-
-    if (!_hasShown90s && seconds >= 90) {
-      _hasShown90s = true;
-      _showPresenceMessage(_build90sMessage());
-      return;
-    }
-
-    if (!_hasShown150s && seconds >= 150) {
-      _hasShown150s = true;
-      _showPresenceMessage(_buildMemoryReactionMessage());
-      _savePersistentMemoryReaction();
-      return;
-    }
-  }
-
-  String _build90sMessage() {
-    if (_storedMemoryImprint == 'active' && _interactionCount >= 8) {
-      return 'it responds faster this time';
-    }
-
-    if (_storedMemoryImprint == 'still' && _interactionCount < 8) {
-      return 'it settles into your silence';
-    }
-
-    if (_interactionCount >= 12) {
-      return 'it reacts when you move';
-    }
-
-    return 'it waits with you';
-  }
-
-  String _buildMemoryReactionMessage() {
-    final bool activeReaction =
-        _interactionCount >= 18 || _peakInteractionEnergy >= 0.35;
-
-    if (_storedTotalSessions > 0) {
-      if (activeReaction) {
-        return 'it remembers how you move through it';
-      }
-      return 'it remembers how quietly you stayed';
-    }
-
-    if (activeReaction) {
-      return 'it remembers how you touched the room';
-    }
-
-    return 'it remembers how still you were';
-  }
-
-  void _handlePersistentMemoryMoment() {
-    if (_hasTriggeredPersistentMemory) return;
-    if (!_isMemoryLoaded) return;
-    if (_presence.inSeconds < 110) return;
-    if (_storedTotalSessions <= 0) return;
-
-    if (_storedMemoryImprint == 'active' && _interactionEnergy > 0.12) {
-      _hasTriggeredPersistentMemory = true;
-      _showPresenceMessage('it falls back into your old rhythm');
-      return;
-    }
-
-    if (_storedMemoryImprint == 'still' && _interactionCount < 6) {
-      _hasTriggeredPersistentMemory = true;
-      _showPresenceMessage('it recognizes your quiet');
-    }
-  }
-
-  void _handleAmbientEvent() {
-    if (_nextAmbientEventAt == null) return;
-    if (_presence < const Duration(seconds: 24)) return;
-
-    if (_presence >= _nextAmbientEventAt!) {
-      final List<String> events = <String>[
-        'did it move?',
-        'you felt that too',
-        'something shifted',
-        'the room leaned closer',
-      ];
-
-      if (_storedTotalSessions > 1) {
-        events.add('it feels familiar now');
-      }
-
-      _ambientEventMessage = events[_random.nextInt(events.length)];
-      _ambientEventUntil = DateTime.now().add(
-        Duration(milliseconds: 1800 + _random.nextInt(1000)),
-      );
-
-      _scheduleNextAmbientEvent();
-    }
-  }
-
-  void _scheduleNextAmbientEvent() {
-    final int gapSeconds = 14 + _random.nextInt(11);
-    _nextAmbientEventAt = _presence + Duration(seconds: gapSeconds);
-  }
-
-  void _showPresenceMessage(String message) {
-    _presenceMessage = message;
-    _presenceMessageUntil = DateTime.now().add(
-      const Duration(milliseconds: 3200),
-    );
-  }
-
-  void _registerInteraction(Offset localPosition, {double gain = 0.04}) {
-    _interactionCount += 1;
+  void _registerInteraction(Offset pos, {double gain = 0.04}) {
+    _timeSinceInteraction = Duration.zero;
     _interactionEnergy = (_interactionEnergy + gain).clamp(0.0, 1.0);
-    _peakInteractionEnergy = max(_peakInteractionEnergy, _interactionEnergy);
-    _pointerTarget = localPosition;
-  }
-
-  Future<void> _savePersistentMemoryReaction() async {
-    final SharedPreferences? prefs = _prefs;
-    if (prefs == null) return;
-
-    final bool activeReaction =
-        _interactionCount >= 18 || _peakInteractionEnergy >= 0.35;
-    final String sessionType = activeReaction ? 'active' : 'still';
-
-    await prefs.setString(_keyLastSessionType, sessionType);
-    await prefs.setString(_keyMemoryImprint, sessionType);
-
-    _storedLastSessionType = sessionType;
-    _storedMemoryImprint = sessionType;
-  }
-
-  Future<void> _saveSessionSummary() async {
-    if (_hasSavedSessionSummary || _isSavingSessionSummary) return;
-
-    final SharedPreferences? prefs = _prefs;
-    if (prefs == null) return;
-
-    _isSavingSessionSummary = true;
-
-    final int previousPresence = prefs.getInt(_keyTotalPresenceSeconds) ?? 0;
-    final int newPresence = previousPresence + _presence.inSeconds;
-    final int previousMaxStage = prefs.getInt(_keyMaxAmbientStage) ?? 0;
-    final int newMaxStage = max(previousMaxStage, _ambientStage);
-
-    await prefs.setInt(_keyTotalPresenceSeconds, newPresence);
-    await prefs.setInt(_keyMaxAmbientStage, newMaxStage);
-
-    _hasSavedSessionSummary = true;
-    _isSavingSessionSummary = false;
+    _pointerTarget = pos;
   }
 
   void _onPointerHover(PointerHoverEvent event) {
@@ -394,313 +122,206 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
 
   void _onPointerDown(PointerDownEvent event) {
     _isPointerInside = true;
-    _registerInteraction(event.localPosition, gain: 0.06);
-  }
-
-  void _onPointerEnter(PointerEnterEvent event) {
-    _isPointerInside = true;
-    _pointerTarget = event.localPosition;
+    _registerInteraction(event.localPosition, gain: 0.065);
   }
 
   void _onPointerExit(PointerExitEvent event) {
     _isPointerInside = false;
   }
 
-  String? get _overlayMessage {
-    if (_ambientEventMessage != null) return _ambientEventMessage;
-    if (_presenceMessage != null) return _presenceMessage;
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final String? overlayMessage = _overlayMessage;
+    final double presenceSeconds = _presence.inMilliseconds / 1000.0;
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Listener(
-        behavior: HitTestBehavior.opaque,
-        onPointerHover: _onPointerHover,
-        onPointerMove: _onPointerMove,
-        onPointerDown: _onPointerDown,
-        child: MouseRegion(
-          onEnter: _onPointerEnter,
-          onExit: _onPointerExit,
-          child: LayoutBuilder(
-            builder: (BuildContext context, BoxConstraints constraints) {
-              final double width = constraints.maxWidth;
-              final double height = constraints.maxHeight;
-              final bool isCompact = width < 700;
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final Size size = constraints.biggest;
+          final Offset screenCenter = Offset(size.width / 2, size.height / 2);
 
-              final double brandTop = isCompact ? 28 : 40;
-              final double brandFontSize = isCompact ? 11 : 12.5;
-              final double brandLetterSpacing = isCompact ? 3.8 : 4.8;
+          if (_pointerPosition == Offset.zero && _pointerTarget == Offset.zero) {
+            _pointerPosition = screenCenter;
+            _pointerTarget = screenCenter;
+          }
 
-              final double footerBottom = height < 760 ? 24 : 34;
-              final double footerFontSize = isCompact ? 9.4 : 10.5;
-              final double footerLetterSpacing = isCompact ? 2.8 : 3.5;
+          final double logoBaseScale = 1.0 +
+              (_ambientStage * 0.008) +
+              (_interactionEnergy * 0.028) +
+              ((_ambientBreath - 0.5) * 0.018);
 
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 900),
+          final double logoYOffset =
+              ((_ambientDrift - 0.5) * 14.0) - (_interactionEnergy * 3.0);
+
+          final double titleOpacity =
+              (0.20 + (_ambientBreath * 0.10) + (_interactionEnergy * 0.06))
+                  .clamp(0.0, 1.0);
+
+          final double footerOpacity =
+              (0.16 + (_ambientPulse * 0.10) + (_interactionEnergy * 0.05))
+                  .clamp(0.0, 1.0);
+
+          return Listener(
+            behavior: HitTestBehavior.opaque,
+            onPointerHover: _onPointerHover,
+            onPointerMove: _onPointerMove,
+            onPointerDown: _onPointerDown,
+            child: MouseRegion(
+              onExit: _onPointerExit,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 1400),
                 curve: Curves.easeOutCubic,
-                transform: Matrix4.identity()
-                  ..translate(
-                    (_ambientDrift - 0.5) * 10,
-                    (_ambientBreath - 0.5) * 8,
-                  )
-                  ..rotateZ((_ambientDrift - 0.5) * 0.012)
-                  ..scale(
-                    1.0 + (_ambientBreath * 0.006) + (_ambientStage * 0.002),
-                  ),
+                opacity: _didBoot ? 1.0 : 0.0,
                 child: Stack(
                   fit: StackFit.expand,
-                  children: <Widget>[
-                    ZeronDistortion(
-                      presenceSeconds: _presence.inMilliseconds / 1000.0,
-                      ambientStage: _ambientStage,
-                      interactionEnergy:
-                          _interactionEnergy + (_ambientDrift * 0.025),
-                      pointerPosition: _pointerPosition,
-                    ),
-                    ZeronNoise(
-                      presenceSeconds: _presence.inMilliseconds / 1000.0,
-                      ambientStage: _ambientStage,
-                      interactionEnergy:
-                          _interactionEnergy + (_ambientPulse * 0.02),
-                      isPointerInside: _isPointerInside,
-                    ),
+                  children: [
+                    const ColoredBox(color: Colors.black),
+
                     ZeronBackground(
-                      presenceSeconds: _presence.inMilliseconds / 1000.0,
+                      presenceSeconds: presenceSeconds,
                       ambientStage: _ambientStage,
-                      interactionEnergy:
-                          _interactionEnergy + (_ambientBreath * 0.05),
+                      interactionEnergy: _interactionEnergy,
                       pointerPosition: _pointerPosition,
                     ),
+
+                    ZeronDistortion(
+                      presenceSeconds: presenceSeconds,
+                      ambientStage: _ambientStage,
+                      interactionEnergy: _interactionEnergy * 0.58,
+                      pointerPosition: _pointerPosition,
+                    ),
+
                     ZeronGlow(
-                      presenceSeconds: _presence.inMilliseconds / 1000.0,
+                      presenceSeconds: presenceSeconds,
                       ambientStage: _ambientStage,
-                      interactionEnergy:
-                          _interactionEnergy + (_ambientPulse * 0.03),
+                      interactionEnergy: _interactionEnergy,
                       pointerPosition: _pointerPosition,
-                      memoryPresence: _storedTotalSessions > 0 ? 0.08 : 0.0,
-                      memoryType: _storedMemoryImprint,
+                      memoryPresence: 0.0,
+                      memoryType: 'none',
                     ),
+
                     IgnorePointer(
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: <Color>[
-                              Colors.white.withValues(alpha: 0.018),
+                          gradient: RadialGradient(
+                            center: const Alignment(0.0, -0.04),
+                            radius: 1.06,
+                            colors: [
                               Colors.transparent,
-                              Colors.white.withValues(alpha: 0.01),
+                              Colors.black.withValues(alpha: 0.08),
+                              Colors.black.withValues(alpha: 0.24),
+                              Colors.black.withValues(alpha: 0.52),
                             ],
-                            stops: const <double>[0.0, 0.5, 1.0],
+                            stops: const [0.0, 0.48, 0.78, 1.0],
                           ),
                         ),
                       ),
                     ),
-                    SafeArea(
-                      child: Stack(
-                        children: <Widget>[
-                          Align(
-                            alignment: Alignment.topCenter,
-                            child: Padding(
-                              padding: EdgeInsets.only(top: brandTop),
-                              child: Text(
-                                'ZERON TOKYO',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.42),
-                                  fontSize: brandFontSize,
-                                  fontWeight: FontWeight.w300,
-                                  letterSpacing: brandLetterSpacing,
-                                  height: 1.0,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Center(
-                            child: IgnorePointer(
-                              child: AnimatedScale(
-                                scale: 1.0 +
-                                    (_ambientStage * 0.008) +
-                                    (_interactionEnergy * 0.02) +
-                                    (_storedTotalSessions > 0 ? 0.004 : 0.0),
-                                duration: const Duration(milliseconds: 700),
-                                curve: Curves.easeOutCubic,
-                                child: ZeronLogo(isIdle: _isIdle),
-                              ),
-                            ),
-                          ),
-                          if (overlayMessage != null)
-                            _PresenceMessage(
-                              message: overlayMessage,
-                              stage: _ambientStage,
-                              interactionEnergy: _interactionEnergy,
-                            ),
-                          Align(
-                            alignment: Alignment.bottomCenter,
-                            child: Padding(
-                              padding: EdgeInsets.only(bottom: footerBottom),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: <Widget>[
-                                  Container(
-                                    width: isCompact ? 44 : 52,
-                                    height: 1,
-                                    color: Colors.white.withValues(alpha: 0.16),
-                                  ),
-                                  SizedBox(height: isCompact ? 12 : 14),
-                                  Text(
-                                    'AMBIENT PRESENCE INTERFACE',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.28),
-                                      fontSize: footerFontSize,
-                                      fontWeight: FontWeight.w300,
-                                      letterSpacing: footerLetterSpacing,
-                                      height: 1.0,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
+
+                    ZeronNoise(
+                      presenceSeconds: presenceSeconds,
+                      ambientStage: _ambientStage,
+                      interactionEnergy: _interactionEnergy,
+                      isPointerInside: _isPointerInside,
+                    ),
+
+                    Center(
+                      child: Transform.translate(
+                        offset: Offset(0, logoYOffset),
+                        child: AnimatedScale(
+                          duration: const Duration(milliseconds: 650),
+                          curve: Curves.easeOutCubic,
+                          scale: logoBaseScale,
+                          child: ZeronLogo(isIdle: _isIdle),
+                        ),
                       ),
                     ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: _BottomGradient(
-                        stage: _ambientStage,
-                        interactionEnergy: _interactionEnergy,
-                        presenceSeconds: _presence.inMilliseconds / 1000.0,
-                        isIdle: _isIdle,
-                        memoryBoost: _storedTotalSessions > 0 ? 0.03 : 0.0,
+
+                    IgnorePointer(
+                      child: SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 22,
+                          ),
+                          child: Column(
+                            children: [
+                              Align(
+                                alignment: Alignment.topCenter,
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 700),
+                                  opacity: titleOpacity,
+                                  child: Transform.translate(
+                                    offset: Offset(
+                                      0,
+                                      (_ambientBreath - 0.5) * 4.0,
+                                    ),
+                                    child: const Text(
+                                      'ZERON TOKYO',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11.5,
+                                        letterSpacing: 5.6,
+                                        fontWeight: FontWeight.w300,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              AnimatedOpacity(
+                                duration: const Duration(milliseconds: 700),
+                                opacity: footerOpacity,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 56,
+                                      height: 1,
+                                      color: Colors.white.withValues(alpha: 0.18),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'AMBIENT PRESENCE INTERFACE',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9.5,
+                                        letterSpacing: 3.2,
+                                        fontWeight: FontWeight.w300,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _isIdle
+                                          ? 'IDLE PRESENCE ACTIVE'
+                                          : 'FIELD LISTENING',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.42),
+                                        fontSize: 8.5,
+                                        letterSpacing: 2.4,
+                                        fontWeight: FontWeight.w300,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PresenceMessage extends StatelessWidget {
-  const _PresenceMessage({
-    required this.message,
-    required this.stage,
-    required this.interactionEnergy,
-  });
-
-  final String message;
-  final int stage;
-  final double interactionEnergy;
-
-  @override
-  Widget build(BuildContext context) {
-    final double topOffset = 116 + (stage * 10);
-    final double opacity = (0.66 + (interactionEnergy * 0.22)).clamp(0.0, 1.0);
-
-    return IgnorePointer(
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Padding(
-          padding: EdgeInsets.only(top: topOffset),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween<double>(begin: 0.92, end: 1.0),
-            duration: const Duration(milliseconds: 900),
-            curve: Curves.easeOutCubic,
-            builder: (BuildContext context, double scale, Widget? child) {
-              return Transform.scale(scale: scale, child: child);
-            },
-            child: AnimatedOpacity(
-              opacity: opacity,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeOut,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  message,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.88),
-                    fontSize: 13,
-                    letterSpacing: 1.6,
-                    fontWeight: FontWeight.w300,
-                  ),
-                ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomGradient extends StatelessWidget {
-  const _BottomGradient({
-    required this.stage,
-    required this.interactionEnergy,
-    required this.presenceSeconds,
-    required this.isIdle,
-    required this.memoryBoost,
-  });
-
-  final int stage;
-  final double interactionEnergy;
-  final double presenceSeconds;
-  final bool isIdle;
-  final double memoryBoost;
-
-  @override
-  Widget build(BuildContext context) {
-    final double intensity = (0.14 +
-            (stage * 0.07) +
-            (interactionEnergy * 0.28) +
-            (isIdle ? 0.04 : 0.0) +
-            memoryBoost)
-        .clamp(0.0, 0.6);
-
-    final double height = 220 + (stage * 30) + (interactionEnergy * 80);
-
-    return IgnorePointer(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 900),
-        curve: Curves.easeOutCubic,
-        height: height,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: <Color>[
-              Colors.white.withValues(alpha: intensity * 0.42),
-              Colors.white.withValues(alpha: intensity * 0.14),
-              Colors.transparent,
-            ],
-            stops: <double>[
-              0.0,
-              0.42 + (sin(presenceSeconds * 0.2) * 0.04),
-              1.0,
-            ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
