@@ -1,4 +1,6 @@
-import 'dart:math';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 class ZeronNoise extends StatelessWidget {
@@ -20,7 +22,6 @@ class ZeronNoise extends StatelessWidget {
     return IgnorePointer(
       child: RepaintBoundary(
         child: CustomPaint(
-          size: Size.infinite,
           painter: _ZeronNoisePainter(
             presenceSeconds: presenceSeconds,
             ambientStage: ambientStage,
@@ -50,90 +51,200 @@ class _ZeronNoisePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Rect rect = Offset.zero & size;
 
-    final double stageBoost = ambientStage * 0.004;
-    final double interactionBoost = interactionEnergy * 0.012;
-    final double pointerBoost = isPointerInside ? 0.004 : 0.0;
-    final double shimmer = ((sin(presenceSeconds * 0.7) + 1) * 0.5) * 0.004;
+    final double stage = ambientStage.clamp(0, 10).toDouble();
+    final double t = presenceSeconds;
 
-    final Paint vignettePaint = Paint()
+    final double energy = interactionEnergy;
+
+    final double drift = math.sin(t * 0.08);
+    final double pulse = (math.sin(t * 0.5) + 1.0) * 0.5;
+
+    final double baseNoise = 0.0025 + stage * 0.0015;
+    final double interactionBoost = energy * 0.008;
+    final double pointerBoost = isPointerInside ? 0.002 : 0.0;
+
+    _paintVignette(canvas, rect, baseNoise, interactionBoost);
+    _paintAtmosphere(canvas, size, drift, pulse, baseNoise, interactionBoost, pointerBoost);
+    _paintDepthLayers(canvas, size, drift, baseNoise);
+    _paintGrain(canvas, size, baseNoise, interactionBoost, pointerBoost);
+    _paintDust(canvas, size, pulse, baseNoise);
+    _paintScan(canvas, size, pulse, baseNoise);
+  }
+
+  // ===== 外周暗部（存在感）=====
+  void _paintVignette(Canvas canvas, Rect rect, double base, double boost) {
+    final paint = Paint()
       ..shader = RadialGradient(
-        center: Alignment.center,
-        radius: 1.08,
-        colors: <Color>[
+        radius: 1.15,
+        colors: [
           Colors.transparent,
-          Colors.black.withValues(alpha: 0.06 + stageBoost),
-          Colors.black.withValues(
-            alpha: 0.18 + stageBoost + interactionBoost * 0.5,
-          ),
+          Colors.black.withOpacity(0.04 + base * 8),
+          Colors.black.withOpacity(0.12 + base * 18 + boost * 10),
         ],
-        stops: const <double>[0.0, 0.74, 1.0],
+        stops: const [0.0, 0.8, 1.0],
       ).createShader(rect);
 
-    canvas.drawRect(rect, vignettePaint);
+    canvas.drawRect(rect, paint);
+  }
 
-    final double hazeHeight = 84 + (ambientStage * 10);
-    final double hazeY =
-        size.height * (0.35 + sin(presenceSeconds * 0.22) * 0.03);
+  // ===== 空気（重要）=====
+  void _paintAtmosphere(
+    Canvas canvas,
+    Size size,
+    double drift,
+    double pulse,
+    double base,
+    double boost,
+    double pointer,
+  ) {
+    final double shortSide = math.min(size.width, size.height);
 
-    final Paint hazePaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: <Color>[
-          Colors.transparent,
-          Colors.white.withValues(
-            alpha: 0.007 + shimmer + pointerBoost * 0.4,
-          ),
-          Colors.transparent,
-        ],
-      ).createShader(
-        Rect.fromLTWH(0, hazeY, size.width, hazeHeight),
-      );
-
-    canvas.drawRect(
-      Rect.fromLTWH(0, hazeY, size.width, hazeHeight),
-      hazePaint,
+    final Offset c1 = Offset(
+      size.width * (0.28 + drift * 0.02),
+      size.height * 0.32,
     );
 
-    final Random random =
-        Random((presenceSeconds * 60).floor() + ambientStage * 97);
+    final Offset c2 = Offset(
+      size.width * (0.72 - drift * 0.02),
+      size.height * 0.58,
+    );
 
-    final Paint grainPaint = Paint()..style = PaintingStyle.fill;
-    final int grainCount = 34 +
-        (ambientStage * 8) +
-        (interactionEnergy * 18).round() +
-        (isPointerInside ? 6 : 0);
-
-    for (int i = 0; i < grainCount; i++) {
-      final double x = random.nextDouble() * size.width;
-      final double y = random.nextDouble() * size.height;
-      final double s = 0.55 + random.nextDouble() * 0.75;
-
-      grainPaint.color = Colors.white.withValues(
-        alpha: (0.012 +
-                random.nextDouble() * 0.018 +
-                stageBoost * 0.4 +
-                interactionBoost * 0.35)
-            .clamp(0.0, 0.03),
+    final paintA = Paint()
+      ..shader = ui.Gradient.radial(
+        c1,
+        shortSide * 0.6,
+        [
+          const Color(0xFF5A7CFF)
+              .withOpacity(0.015 + base * 6 + pulse * 0.02),
+          Colors.transparent,
+        ],
       );
 
-      canvas.drawRect(Rect.fromLTWH(x, y, s, s), grainPaint);
+    final paintB = Paint()
+      ..shader = ui.Gradient.radial(
+        c2,
+        shortSide * 0.7,
+        [
+          const Color(0xFF7FE6FF)
+              .withOpacity(0.012 + base * 5 + pointer * 4),
+          Colors.transparent,
+        ],
+      );
+
+    canvas.drawCircle(c1, shortSide * 0.6, paintA);
+    canvas.drawCircle(c2, shortSide * 0.7, paintB);
+  }
+
+  // ===== 奥行き =====
+  void _paintDepthLayers(Canvas canvas, Size size, double drift, double base) {
+    final List<double> xs = [0.18, 0.5, 0.82];
+
+    for (int i = 0; i < xs.length; i++) {
+      final double width = size.width * (0.06 + i * 0.02);
+
+      final double x = size.width * xs[i] +
+          math.sin(presenceSeconds * (0.05 + i * 0.02)) * 8;
+
+      final paint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            const Color(0xFF9FD7FF).withOpacity(0.002 + base * 4),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromLTWH(x, 0, width, size.height));
+
+      canvas.drawRect(Rect.fromLTWH(x, 0, width, size.height), paint);
     }
+  }
 
-    final double lineAlpha =
-        (0.006 + stageBoost * 0.4 + pointerBoost * 0.4).clamp(0.0, 0.012);
+  // ===== 細かいノイズ =====
+  void _paintGrain(
+    Canvas canvas,
+    Size size,
+    double base,
+    double boost,
+    double pointer,
+  ) {
+    final int seed = (presenceSeconds * 80).floor() + ambientStage * 99;
+    final random = math.Random(seed);
 
-    final Paint linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = Colors.white.withValues(alpha: lineAlpha);
+    final paint = Paint();
 
-    final double gap = 22 + ambientStage * 2.0;
-    for (double y = 10; y < size.height; y += gap) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    final int count =
+        70 + ambientStage * 10 + (interactionEnergy * 20).round();
+
+    for (int i = 0; i < count; i++) {
+      final double x = random.nextDouble() * size.width;
+      final double y = random.nextDouble() * size.height;
+
+      paint.color = Colors.white.withOpacity(
+        (base + random.nextDouble() * 0.003 + boost + pointer)
+            .clamp(0.0, 0.01),
+      );
+
+      canvas.drawRect(Rect.fromLTWH(x, y, 0.6, 0.6), paint);
+    }
+  }
+
+  // ===== 微粒子 =====
+  void _paintDust(
+    Canvas canvas,
+    Size size,
+    double pulse,
+    double base,
+  ) {
+    final random = math.Random(
+        4000 + ambientStage * 33 + (presenceSeconds * 10).floor());
+
+    final paint = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
+
+    for (int i = 0; i < 10 + ambientStage * 2; i++) {
+      final Offset p = Offset(
+        random.nextDouble() * size.width,
+        random.nextDouble() * size.height,
+      );
+
+      paint.color = const Color(0xFFBFE8FF).withOpacity(
+        (base + pulse * 0.003).clamp(0.0, 0.01),
+      );
+
+      canvas.drawCircle(p, 1.2, paint);
+    }
+  }
+
+  // ===== 走査線（微弱）=====
+  void _paintScan(Canvas canvas, Size size, double pulse, double base) {
+    final random =
+        math.Random(8000 + (presenceSeconds * 6).floor());
+
+    final int lines = 1 + ambientStage ~/ 4;
+
+    for (int i = 0; i < lines; i++) {
+      final double y = random.nextDouble() * size.height;
+
+      final paint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Colors.transparent,
+            const Color(0xFFB8E7FF)
+                .withOpacity((base + pulse * 0.002).clamp(0.0, 0.008)),
+            Colors.transparent,
+          ],
+        ).createShader(Rect.fromLTWH(0, y, size.width, 40));
+
+      canvas.drawRect(Rect.fromLTWH(0, y, size.width, 40), paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _ZeronNoisePainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ZeronNoisePainter oldDelegate) {
+    return oldDelegate.presenceSeconds != presenceSeconds ||
+        oldDelegate.ambientStage != ambientStage ||
+        oldDelegate.interactionEnergy != interactionEnergy ||
+        oldDelegate.isPointerInside != isPointerInside;
+  }
 }

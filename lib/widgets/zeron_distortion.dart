@@ -20,7 +20,6 @@ class ZeronDistortion extends StatelessWidget {
     return IgnorePointer(
       child: RepaintBoundary(
         child: CustomPaint(
-          size: Size.infinite,
           painter: _DistortionPainter(
             presenceSeconds: presenceSeconds,
             ambientStage: ambientStage,
@@ -48,107 +47,187 @@ class _DistortionPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
+    final Paint paint = Paint();
 
-    final double pointerY =
-        size.height == 0 ? 0.5 : (pointerPosition.dy / size.height).clamp(0.0, 1.0);
+    final bool pointerActive = pointerPosition != Offset.zero;
 
-    // --- 横方向の“空間の歪み”（かなり弱く）
-    final int bandCount = 3 + ambientStage;
+    final double pointerX = pointerActive
+        ? (pointerPosition.dx / size.width).clamp(0.0, 1.0)
+        : 0.5;
 
-    for (int i = 0; i < bandCount; i++) {
-      final double progress = i / max(1, bandCount - 1);
+    final double pointerY = pointerActive
+        ? (pointerPosition.dy / size.height).clamp(0.0, 1.0)
+        : 0.5;
 
-      final double speed = 0.12 + (i * 0.05);
+    final Offset pointer = Offset(pointerX * size.width, pointerY * size.height);
 
-      final double height =
-          22 + (ambientStage * 5) + (interactionEnergy * 16);
+    final int fieldCount = 2 + ambientStage;
 
-      final double centerY = size.height *
-          (0.22 +
-              progress * 0.56 +
-              (sin((presenceSeconds * speed) + i) * 0.05) +
-              ((pointerY - 0.5) * 0.08));
+    // =========================
+    // 空間歪みフィールド（本体）
+    // =========================
+    for (int i = 0; i < fieldCount; i++) {
+      final double t = presenceSeconds * (0.25 + i * 0.08);
 
-      final double dx =
-          sin((presenceSeconds * (1.0 + i * 0.18)) + i) *
-              (6 + ambientStage * 2.2) +
-          (interactionEnergy * 14);
+      final double baseY =
+          size.height * (0.3 + (i / fieldCount) * 0.4);
 
-      final Rect rect = Rect.fromLTWH(
-        dx,
-        centerY,
-        size.width,
-        height,
-      );
+      final double amplitude =
+          10 + ambientStage * 4 + interactionEnergy * 14;
+
+      final double thickness =
+          80 + ambientStage * 14 + interactionEnergy * 30;
+
+      final Path path = Path();
+
+      for (double x = -60; x <= size.width + 60; x += 6) {
+        double y = baseY +
+            sin((x * 0.012) + t) * amplitude;
+
+        // ===== 重力歪み =====
+        if (pointerActive) {
+          final dx = x - pointer.dx;
+          final dy = y - pointer.dy;
+
+          final dist = sqrt(dx * dx + dy * dy);
+
+          final influence = (1 - (dist / 260)).clamp(0.0, 1.0);
+
+          if (influence > 0) {
+            final warp = pow(influence, 2) *
+                (40 + interactionEnergy * 60);
+
+            y += (dy / (dist + 0.001)) * warp;
+          }
+        }
+
+        if (x == -60) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+
+      for (double x = size.width + 60; x >= -60; x -= 6) {
+        double y = baseY +
+            sin((x * 0.012) + t) * amplitude +
+            thickness;
+
+        if (pointerActive) {
+          final dx = x - pointer.dx;
+          final dy = y - pointer.dy;
+
+          final dist = sqrt(dx * dx + dy * dy);
+
+          final influence = (1 - (dist / 260)).clamp(0.0, 1.0);
+
+          if (influence > 0) {
+            final warp = pow(influence, 2) *
+                (40 + interactionEnergy * 60);
+
+            y += (dy / (dist + 0.001)) * warp;
+          }
+        }
+
+        path.lineTo(x, y);
+      }
+
+      path.close();
 
       paint.shader = LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
         colors: [
           Colors.transparent,
-          Colors.white.withValues(
-            alpha: (0.010 +
-                    (ambientStage * 0.008) +
-                    (interactionEnergy * 0.015))
-                .clamp(0.0, 0.05),
+          Colors.white.withOpacity(
+            (0.004 +
+                    ambientStage * 0.004 +
+                    interactionEnergy * 0.008)
+                .clamp(0.0, 0.025),
           ),
           Colors.transparent,
         ],
-      ).createShader(rect);
+      ).createShader(
+        Rect.fromLTWH(
+          0,
+          baseY - thickness,
+          size.width,
+          thickness * 2,
+        ),
+      );
 
-      canvas.drawRect(rect, paint);
+      canvas.drawPath(path, paint);
     }
 
-    // --- 微細なライン歪み（感じるレベル）
-    if (ambientStage >= 1 || interactionEnergy > 0.04) {
-      final int lineCount = 8 + ambientStage * 5;
+    // =========================
+    // 微細ゆらぎ（空間ノイズ）
+    // =========================
+    if (ambientStage >= 1 || interactionEnergy > 0.05) {
+      final int rippleCount = 3 + ambientStage;
 
-      final linePaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
+      for (int i = 0; i < rippleCount; i++) {
+        final double t = presenceSeconds * (0.8 + i * 0.2);
 
-      for (int i = 0; i < lineCount; i++) {
-        final double y = size.height *
-                ((i + 1) / (lineCount + 1)) +
-            sin((presenceSeconds * 0.8) + i) *
-                (1.8 + ambientStage.toDouble());
+        final double centerY =
+            size.height * (0.2 + (i / rippleCount) * 0.6);
 
-        final double shift =
-            sin((presenceSeconds * 2.0) + i * 0.6) *
-                (4 + ambientStage * 2.2 + interactionEnergy * 8);
+        final Path path = Path();
 
-        final double alpha = (0.012 +
-                (ambientStage * 0.005) +
-                (interactionEnergy * 0.012))
-            .clamp(0.0, 0.05);
+        for (double x = 0; x <= size.width; x += 8) {
+          double y = centerY +
+              sin((x * 0.02) + t) *
+                  (4 + ambientStage * 2 + interactionEnergy * 8);
 
-        linePaint
-          ..strokeWidth = 0.6
-          ..color = Colors.white.withValues(alpha: alpha);
+          if (pointerActive) {
+            final dx = x - pointer.dx;
+            final dy = y - pointer.dy;
+            final dist = sqrt(dx * dx + dy * dy);
 
-        canvas.drawLine(
-          Offset(-20 + shift, y),
-          Offset(size.width + 20 + shift, y),
-          linePaint,
-        );
+            final influence = (1 - (dist / 220)).clamp(0.0, 1.0);
+
+            if (influence > 0) {
+              y += dy * influence * 0.15;
+            }
+          }
+
+          if (x == 0) {
+            path.moveTo(x, y);
+          } else {
+            path.lineTo(x, y);
+          }
+        }
+
+        final ripplePaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = Colors.white.withOpacity(
+            (0.002 +
+                    ambientStage * 0.002 +
+                    interactionEnergy * 0.005)
+                .clamp(0.0, 0.015),
+          );
+
+        canvas.drawPath(path, ripplePaint);
       }
     }
 
-    // --- 空間の“膜”（ほぼ感じないレベル）
+    // =========================
+    // 空間ヴェール（深度）
+    // =========================
     if (ambientStage >= 2) {
       final Rect rect = Offset.zero & size;
 
       final paintVeil = Paint()
         ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.006 + interactionEnergy * 0.008),
+            Colors.white.withOpacity(
+                0.003 + interactionEnergy * 0.005),
             Colors.transparent,
-            Colors.white.withValues(alpha: 0.008 + ambientStage * 0.005),
+            Colors.white.withOpacity(
+                0.004 + ambientStage * 0.004),
           ],
-          stops: const [0.0, 0.5, 1.0],
         ).createShader(rect);
 
       canvas.drawRect(rect, paintVeil);
@@ -157,6 +236,9 @@ class _DistortionPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DistortionPainter old) {
-    return true;
+    return old.presenceSeconds != presenceSeconds ||
+        old.ambientStage != ambientStage ||
+        old.interactionEnergy != interactionEnergy ||
+        old.pointerPosition != pointerPosition;
   }
 }

@@ -1,4 +1,6 @@
-import 'dart:math';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 class ZeronBackground extends StatefulWidget {
@@ -22,108 +24,24 @@ class ZeronBackground extends StatefulWidget {
 class _ZeronBackgroundState extends State<ZeronBackground>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  final Random _random = Random();
-  final List<_Particle> _particles = <_Particle>[];
+  late final List<_StarParticle> _particles;
 
-  Size _lastSize = Size.zero;
-
-  static const int _baseParticleCount = 42;
-  static const int _maxAdditionalParticles = 12;
+  static const int _particleCount = 260; // 少し削減して安定化
 
   @override
   void initState() {
     super.initState();
 
+    final random = math.Random(77);
+    _particles = List.generate(
+      _particleCount,
+      (_) => _StarParticle.random(random),
+    );
+
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(days: 1),
-    )
-      ..addListener(_tick)
-      ..forward();
-
-    _generateInitialParticles();
-  }
-
-  void _generateInitialParticles() {
-    if (_particles.isNotEmpty) return;
-
-    final int total = _targetParticleCount();
-    for (int i = 0; i < total; i++) {
-      _particles.add(_Particle.random(_random));
-    }
-  }
-
-  int _targetParticleCount() {
-    return (_baseParticleCount +
-            (widget.ambientStage * 3) +
-            (widget.interactionEnergy * _maxAdditionalParticles).round())
-        .clamp(_baseParticleCount, _baseParticleCount + _maxAdditionalParticles);
-  }
-
-  void _syncParticleCount() {
-    final int target = _targetParticleCount();
-
-    if (_particles.length < target) {
-      for (int i = 0; i < target - _particles.length; i++) {
-        _particles.add(_Particle.random(_random));
-      }
-      return;
-    }
-
-    if (_particles.length > target) {
-      _particles.removeRange(target, _particles.length);
-    }
-  }
-
-  Offset _normalizedPointer() {
-    if (_lastSize.width <= 0 || _lastSize.height <= 0) {
-      return const Offset(0.5, 0.5);
-    }
-
-    return Offset(
-      (widget.pointerPosition.dx / _lastSize.width).clamp(0.0, 1.0),
-      (widget.pointerPosition.dy / _lastSize.height).clamp(0.0, 1.0),
-    );
-  }
-
-  void _tick() {
-    _syncParticleCount();
-
-    final Offset pointer = _normalizedPointer();
-    final double stageEnergy = (widget.ambientStage / 3.0).clamp(0.0, 1.0);
-    final double time = widget.presenceSeconds;
-
-    for (final _Particle particle in _particles) {
-      particle.update(
-        pointer: pointer,
-        interactionEnergy: widget.interactionEnergy,
-        stageEnergy: stageEnergy,
-        time: time,
-      );
-    }
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        _lastSize = Size(constraints.maxWidth, constraints.maxHeight);
-
-        return CustomPaint(
-          size: Size.infinite,
-          painter: _BackgroundPainter(
-            particles: _particles,
-            presenceSeconds: widget.presenceSeconds,
-            ambientStage: widget.ambientStage,
-            interactionEnergy: widget.interactionEnergy,
-          ),
-        );
-      },
-    );
+      duration: const Duration(seconds: 24),
+    )..repeat();
   }
 
   @override
@@ -131,143 +49,217 @@ class _ZeronBackgroundState extends State<ZeronBackground>
     _controller.dispose();
     super.dispose();
   }
-}
 
-class _Particle {
-  _Particle({
-    required this.x,
-    required this.y,
-    required this.depth,
-    required this.baseSize,
-    required this.baseOpacity,
-    required this.phase,
-    required this.streamSeed,
-    required this.orbitSeed,
-    required this.driftDirection,
-  });
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: RepaintBoundary( // ★重要：パフォーマンス最適化
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final blendedTime =
+                (_controller.value + widget.presenceSeconds * 0.018) % 1.0;
 
-  double x;
-  double y;
-  double depth;
-  double baseSize;
-  double baseOpacity;
-  double phase;
-  double streamSeed;
-  double orbitSeed;
-  double driftDirection;
-
-  factory _Particle.random(Random random) {
-    return _Particle(
-      x: random.nextDouble(),
-      y: random.nextDouble(),
-      depth: 0.18 + (random.nextDouble() * 0.82),
-      baseSize: 0.5 + (random.nextDouble() * 1.7),
-      baseOpacity: 0.035 + (random.nextDouble() * 0.12),
-      phase: random.nextDouble() * pi * 2,
-      streamSeed: random.nextDouble() * pi * 2,
-      orbitSeed: random.nextDouble() * pi * 2,
-      driftDirection: random.nextBool() ? 1.0 : -1.0,
+            return CustomPaint(
+              painter: _ZeronBackgroundPainter(
+                particles: _particles,
+                time: blendedTime,
+                presenceSeconds: widget.presenceSeconds,
+                ambientStage: widget.ambientStage,
+                interactionEnergy: widget.interactionEnergy,
+                pointer: widget.pointerPosition,
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
-
-  void update({
-    required Offset pointer,
-    required double interactionEnergy,
-    required double stageEnergy,
-    required double time,
-  }) {
-    final double depthSpeed = lerpDouble(0.00022, 0.00145, depth)!;
-    y += depthSpeed * (1.0 + stageEnergy * 0.10);
-
-    final double horizontalStream = sin((time * 0.11) + streamSeed + (y * 5.8)) *
-        (0.00010 + depth * 0.00018);
-
-    final double orbitalDrift = cos((time * 0.07) + orbitSeed + (x * 4.0)) *
-        (0.00004 + depth * 0.00008) *
-        driftDirection;
-
-    final double centerPull = ((0.5 - x) * (0.000025 + depth * 0.000045));
-
-    x += horizontalStream + orbitalDrift + centerPull;
-
-    final double dx = x - pointer.dx;
-    final double dy = y - pointer.dy;
-    final double distance = sqrt((dx * dx) + (dy * dy));
-
-    if (distance < 0.14) {
-      final double repulsion = (0.14 - distance) *
-          (0.00032 + interactionEnergy * 0.00065) *
-          (0.55 + depth * 0.7);
-
-      x += dx * repulsion;
-      y += dy * repulsion * 0.22;
-    }
-
-    if (x < -0.08) x = 1.08;
-    if (x > 1.08) x = -0.08;
-
-    if (y > 1.10) {
-      y = -0.10;
-      x = 0.14 + Random((phase * 100000).round() + (time * 10).round())
-          .nextDouble() * 0.72;
-    }
-  }
 }
 
-class _BackgroundPainter extends CustomPainter {
-  const _BackgroundPainter({
+class _ZeronBackgroundPainter extends CustomPainter {
+  _ZeronBackgroundPainter({
     required this.particles,
+    required this.time,
     required this.presenceSeconds,
     required this.ambientStage,
     required this.interactionEnergy,
+    required this.pointer,
   });
 
-  final List<_Particle> particles;
+  final List<_StarParticle> particles;
+  final double time;
   final double presenceSeconds;
   final int ambientStage;
   final double interactionEnergy;
+  final Offset pointer;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()..style = PaintingStyle.fill;
+    final rect = Offset.zero & size;
 
-    final double breath = (sin(presenceSeconds * 0.16) + 1) * 0.5;
-    final double stageBoost = ambientStage * 0.010;
+    _paintBaseSpace(canvas, rect);
+    _paintNebula(canvas, size);
 
-    for (final _Particle particle in particles) {
-      final double twinkle = (sin(
-                (presenceSeconds * (0.22 + particle.depth * 0.55)) +
-                    particle.phase,
-              ) +
-              1) *
-          0.5;
+    final center = Offset(size.width / 2, size.height / 2);
+    final orbitBase = math.max(size.width, size.height) * 0.56;
+    final flowT = time * math.pi * 2.0;
+    final pointerActive = pointer != Offset.zero;
 
-      final double radius = (particle.baseSize *
-              (0.55 + particle.depth * 1.35) +
-              (twinkle * 0.16) +
-              (interactionEnergy * 0.08))
-          .clamp(0.35, 2.7);
+    for (final p in particles) {
+      final travel = (p.seed + time * p.forwardSpeed) % 1.0;
+      final eased = Curves.easeOutCubic.transform(travel);
 
-      final double opacity = (particle.baseOpacity +
-              (twinkle * 0.030) +
-              (breath * 0.014) +
-              stageBoost +
-              (interactionEnergy * 0.028))
-          .clamp(0.025, 0.20);
+      final orbitRadius =
+          ui.lerpDouble(orbitBase * 0.05, orbitBase * 1.2, eased)!;
 
-      paint.color = Colors.white.withValues(alpha: opacity);
+      final angle =
+          p.baseAngle + flowT * p.rotationSpeed + orbitRadius * p.spiralTightness;
 
-      canvas.drawCircle(
-        Offset(
-          particle.x * size.width,
-          particle.y * size.height,
-        ),
-        radius,
-        paint,
-      );
+      double x = center.dx + math.cos(angle) * orbitRadius;
+      double y = center.dy + math.sin(angle) * orbitRadius * p.verticalFlatten;
+
+      Offset point = Offset(x, y);
+
+      // ===== カーソル反応（大幅改善）=====
+      if (pointerActive) {
+        final toPoint = point - pointer;
+        final distance = toPoint.distance;
+
+        final radius = 220 + ambientStage * 30;
+
+        if (distance < radius) {
+          final power = 1.0 - (distance / radius);
+          final force = Curves.easeOut.transform(power);
+
+          final dir = distance < 0.001
+              ? Offset(math.cos(p.baseAngle), math.sin(p.baseAngle))
+              : toPoint / distance;
+
+          // 放射 + 渦
+          final radial = dir * (force * 120 * (1 + interactionEnergy * 0.5));
+          final swirl = Offset(-dir.dy, dir.dx) *
+              (force * 40 * (p.swirlDirection));
+
+          point += radial + swirl;
+        }
+      }
+
+      final sizePx = ui.lerpDouble(0.5, p.maxSize + ambientStage * 0.2, eased)!;
+      final alpha = (0.15 + eased * 0.85) * p.alpha;
+
+      final color = Color.lerp(
+        const Color(0xFF78D6FF),
+        Colors.white,
+        p.colorMix,
+      )!
+          .withOpacity(alpha);
+
+      final paint = Paint()..color = color;
+
+      canvas.drawCircle(point, sizePx, paint);
     }
+
+    _paintCenterAura(canvas, size, center);
+  }
+
+  void _paintBaseSpace(Canvas canvas, Rect rect) {
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFF02040A),
+          Color(0xFF040915),
+          Color(0xFF010204),
+        ],
+      ).createShader(rect);
+
+    canvas.drawRect(rect, paint);
+  }
+
+  void _paintNebula(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.3, -0.2),
+        radius: 0.8,
+        colors: [
+          const Color(0xFF4966FF).withOpacity(0.08),
+          Colors.transparent,
+        ],
+      ).createShader(Offset.zero & size);
+
+    canvas.drawRect(Offset.zero & size, paint);
+  }
+
+  void _paintCenterAura(Canvas canvas, Size size, Offset center) {
+    final paint = Paint()
+      ..shader = RadialGradient(
+        radius: 0.25,
+        colors: [
+          const Color(0xFF8DD7FF).withOpacity(0.05),
+          Colors.transparent,
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: center,
+          radius: math.min(size.width, size.height) * 0.25,
+        ),
+      );
+
+    canvas.drawCircle(
+      center,
+      math.min(size.width, size.height) * 0.25,
+      paint,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _BackgroundPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ZeronBackgroundPainter oldDelegate) {
+    return oldDelegate.time != time ||
+        oldDelegate.pointer != pointer ||
+        oldDelegate.interactionEnergy != interactionEnergy ||
+        oldDelegate.ambientStage != ambientStage;
+  }
+}
+
+class _StarParticle {
+  _StarParticle({
+    required this.seed,
+    required this.baseAngle,
+    required this.forwardSpeed,
+    required this.rotationSpeed,
+    required this.spiralTightness,
+    required this.verticalFlatten,
+    required this.maxSize,
+    required this.alpha,
+    required this.colorMix,
+    required this.swirlDirection,
+  });
+
+  final double seed;
+  final double baseAngle;
+  final double forwardSpeed;
+  final double rotationSpeed;
+  final double spiralTightness;
+  final double verticalFlatten;
+  final double maxSize;
+  final double alpha;
+  final double colorMix;
+  final double swirlDirection;
+
+  factory _StarParticle.random(math.Random random) {
+    return _StarParticle(
+      seed: random.nextDouble(),
+      baseAngle: random.nextDouble() * math.pi * 2,
+      forwardSpeed: 0.2 + random.nextDouble() * 0.4,
+      rotationSpeed: 0.1 + random.nextDouble() * 0.3,
+      spiralTightness: 0.002 + random.nextDouble() * 0.003,
+      verticalFlatten: 0.5 + random.nextDouble() * 0.3,
+      maxSize: 1.0 + random.nextDouble() * 2.5,
+      alpha: 0.3 + random.nextDouble() * 0.6,
+      colorMix: random.nextDouble(),
+      swirlDirection: random.nextBool() ? 1.0 : -1.0,
+    );
+  }
 }

@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 class ZeronLogo extends StatefulWidget {
@@ -16,59 +18,31 @@ class ZeronLogo extends StatefulWidget {
 class _ZeronLogoState extends State<ZeronLogo>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late Animation<double> _scale;
-  late Animation<double> _opacity;
-  late Animation<double> _glow;
-  late Animation<double> _coreGlow;
+
+  static const String _assetPath = 'assets/brand/zeron_symbol_white.png';
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this);
-    _configureAnimations();
-    _controller.repeat(reverse: true);
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: widget.isIdle ? 6200 : 4200),
+    )..repeat(reverse: true);
   }
 
   @override
   void didUpdateWidget(covariant ZeronLogo oldWidget) {
     super.didUpdateWidget(oldWidget);
+
     if (oldWidget.isIdle != widget.isIdle) {
-      _configureAnimations();
+      _controller.duration =
+          Duration(milliseconds: widget.isIdle ? 6200 : 4200);
+
       _controller
         ..reset()
         ..repeat(reverse: true);
     }
-  }
-
-  void _configureAnimations() {
-    final int durationMs = widget.isIdle ? 5600 : 4200;
-
-    _controller.duration = Duration(milliseconds: durationMs);
-
-    final CurvedAnimation curved = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutCubic,
-    );
-
-    _scale = Tween<double>(
-      begin: widget.isIdle ? 0.986 : 0.978,
-      end: widget.isIdle ? 1.014 : 1.026,
-    ).animate(curved);
-
-    _opacity = Tween<double>(
-      begin: widget.isIdle ? 0.93 : 0.89,
-      end: 1.0,
-    ).animate(curved);
-
-    _glow = Tween<double>(
-      begin: widget.isIdle ? 0.085 : 0.11,
-      end: widget.isIdle ? 0.17 : 0.24,
-    ).animate(curved);
-
-    _coreGlow = Tween<double>(
-      begin: widget.isIdle ? 0.14 : 0.18,
-      end: widget.isIdle ? 0.26 : 0.34,
-    ).animate(curved);
   }
 
   @override
@@ -78,10 +52,10 @@ class _ZeronLogoState extends State<ZeronLogo>
   }
 
   double _logoSize(double width) {
-    if (width >= 1600) return 214;
-    if (width >= 1300) return 192;
-    if (width >= 1000) return 172;
-    if (width >= 700) return 144;
+    if (width >= 1600) return 220;
+    if (width >= 1300) return 198;
+    if (width >= 1000) return 176;
+    if (width >= 700) return 148;
     return width * 0.34;
   }
 
@@ -89,77 +63,131 @@ class _ZeronLogoState extends State<ZeronLogo>
   Widget build(BuildContext context) {
     final double size = _logoSize(MediaQuery.of(context).size.width);
 
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (BuildContext context, Widget? child) {
-        return Opacity(
-          opacity: _opacity.value,
-          child: Transform.scale(
-            scale: _scale.value,
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: Stack(
-                alignment: Alignment.center,
-                children: <Widget>[
-                  Opacity(
-                    opacity: _glow.value * 0.42,
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(
-                        sigmaX: widget.isIdle ? 34 : 40,
-                        sigmaY: widget.isIdle ? 34 : 40,
+    return RepaintBoundary( // ★パフォーマンス安定
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final double t = _controller.value;
+
+          final double scale =
+              widget.isIdle ? (0.992 + t * 0.018) : (0.982 + t * 0.042);
+
+          final double opacity =
+              widget.isIdle ? (0.94 + t * 0.06) : (0.90 + t * 0.10);
+
+          final double drift =
+              (math.sin(t * math.pi * 2) *
+                  (widget.isIdle ? 1.8 : 2.8));
+
+          final double glowStrength =
+              widget.isIdle ? 0.12 + t * 0.10 : 0.18 + t * 0.20;
+
+          final double shimmer =
+              (math.sin(t * math.pi * 2) + 1.0) * 0.5;
+
+          return Opacity(
+            opacity: opacity,
+            child: Transform.translate(
+              offset: Offset(0, drift * 0.4),
+              child: Transform.scale(
+                scale: scale,
+                child: SizedBox(
+                  width: size * 1.25,
+                  height: size * 1.25,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+
+                      // ===== 外側の存在感 =====
+                      Opacity(
+                        opacity: glowStrength * 0.8,
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: widget.isIdle ? 42 : 52,
+                            sigmaY: widget.isIdle ? 42 : 52,
+                          ),
+                          child: Image.asset(
+                            _assetPath,
+                            width: size * 1.25,
+                            height: size * 1.25,
+                          ),
+                        ),
                       ),
-                      child: Image.asset(
-                        'assets/brand/zeron_symbol_white.png',
-                        width: size * 1.16,
-                        height: size * 1.16,
+
+                      // ===== 中間の光 =====
+                      Opacity(
+                        opacity: glowStrength,
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: widget.isIdle ? 18 : 26,
+                            sigmaY: widget.isIdle ? 18 : 26,
+                          ),
+                          child: Image.asset(
+                            _assetPath,
+                            width: size * 1.05,
+                            height: size * 1.05,
+                          ),
+                        ),
+                      ),
+
+                      // ===== コア =====
+                      Image.asset(
+                        _assetPath,
+                        width: size,
+                        height: size,
                         fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
                       ),
-                    ),
+
+                      // ===== シマー（高級感）=====
+                      ClipRect(
+                        child: SizedBox(
+                          width: size * 1.05,
+                          height: size * 1.05,
+                          child: Transform.translate(
+                            offset: Offset(
+                                drift * (widget.isIdle ? 0.6 : 1.0), 0),
+                            child: Opacity(
+                              opacity: (widget.isIdle ? 0.05 : 0.10) +
+                                  shimmer * 0.05,
+                              child: ImageFiltered(
+                                imageFilter: ImageFilter.blur(
+                                  sigmaX: 10,
+                                  sigmaY: 10,
+                                ),
+                                child: ShaderMask(
+                                  blendMode: BlendMode.srcATop,
+                                  shaderCallback: (bounds) {
+                                    return LinearGradient(
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.white.withOpacity(0.9),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.3, 0.5, 0.7],
+                                    ).createShader(bounds);
+                                  },
+                                  child: Image.asset(
+                                    _assetPath,
+                                    width: size,
+                                    height: size,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  Opacity(
-                    opacity: _glow.value,
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(
-                        sigmaX: widget.isIdle ? 18 : 22,
-                        sigmaY: widget.isIdle ? 18 : 22,
-                      ),
-                      child: Image.asset(
-                        'assets/brand/zeron_symbol_white.png',
-                        width: size * 1.03,
-                        height: size * 1.03,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  Opacity(
-                    opacity: _coreGlow.value,
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(
-                        sigmaX: 8,
-                        sigmaY: 8,
-                      ),
-                      child: Image.asset(
-                        'assets/brand/zeron_symbol_white.png',
-                        width: size * 0.95,
-                        height: size * 0.95,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  Image.asset(
-                    'assets/brand/zeron_symbol_white.png',
-                    width: size,
-                    height: size,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
