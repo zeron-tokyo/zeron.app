@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zeron/core/models/app_models.dart';
 import 'package:zeron/features/team/presentation/team_screen.dart';
 import 'package:zeron/widgets/zeron_background.dart';
 import 'package:zeron/widgets/zeron_distortion.dart';
@@ -287,16 +288,16 @@ class _ZeronMainShell extends StatefulWidget {
 class _ZeronMainShellState extends State<_ZeronMainShell> {
   int _currentIndex = 0;
 
-  final _AppSnapshot _data = _AppSnapshot.demo();
+  late final _HomeDemoState _demo = _HomeDemoState.build();
 
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      _TodayPage(data: _data),
-      _DashboardPage(data: _data),
-      _RankPage(data: _data),
+      _TodayPage(data: _demo),
+      _DashboardPage(data: _demo),
+      _RankPage(data: _demo),
       const TeamScreen(),
-      _AccountPage(data: _data),
+      _AccountPage(data: _demo),
     ];
 
     return Container(
@@ -339,12 +340,10 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
 class _TodayPage extends StatelessWidget {
   const _TodayPage({required this.data});
 
-  final _AppSnapshot data;
+  final _HomeDemoState data;
 
   @override
   Widget build(BuildContext context) {
-    final progress = (data.userStepsToday / data.dailyGoalSteps).clamp(0.0, 1.0);
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
@@ -355,11 +354,11 @@ class _TodayPage extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         _GlobeHero(
-          title: '${_formatNumber(data.globalStepsToday)} steps',
+          title: '${_formatNumber(data.global.totalStepsToday)} steps',
           subtitle: 'Global steps today',
-          centerLabel: '${_formatNumber(data.userStepsToday)}',
+          centerLabel: '${_formatNumber(data.user.todaySteps)}',
           bottomLabel: 'You helped Earth today',
-          progress: progress,
+          progress: data.todaySummary.goalProgress,
         ),
         const SizedBox(height: 18),
         Row(
@@ -367,7 +366,7 @@ class _TodayPage extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: 'CO₂ Saved',
-                value: '${data.userCo2Kg.toStringAsFixed(2)} kg',
+                value: '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
                 icon: Icons.eco_outlined,
               ),
             ),
@@ -375,7 +374,7 @@ class _TodayPage extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: 'Prime Points',
-                value: _formatNumber(data.userPrimePoints),
+                value: _formatNumber(data.todaySummary.totalPrimePoints),
                 icon: Icons.bolt_outlined,
               ),
             ),
@@ -392,11 +391,11 @@ class _TodayPage extends StatelessWidget {
         const SizedBox(height: 12),
         _ProgressCard(
           title: 'Daily Goal',
-          current: data.userStepsToday,
-          goal: data.dailyGoalSteps,
+          current: data.todaySummary.totalSteps,
+          goal: data.todaySummary.goalSteps,
         ),
         const SizedBox(height: 12),
-        _ActionCard(
+        const _ActionCard(
           title: 'Why your steps matter',
           body:
               'ZERON converts walking into verified participation data for future sponsor rewards, monthly events, and carbon-credit linked initiatives.',
@@ -409,7 +408,7 @@ class _TodayPage extends StatelessWidget {
 class _DashboardPage extends StatelessWidget {
   const _DashboardPage({required this.data});
 
-  final _AppSnapshot data;
+  final _HomeDemoState data;
 
   @override
   Widget build(BuildContext context) {
@@ -429,7 +428,7 @@ class _DashboardPage extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: 'Active Walkers',
-                value: _formatNumber(data.activeWalkers),
+                value: _formatNumber(data.global.activeUsers),
                 icon: Icons.groups_2_outlined,
               ),
             ),
@@ -437,7 +436,7 @@ class _DashboardPage extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: 'Countries',
-                value: _formatNumber(data.countriesActive),
+                value: _formatNumber(data.global.activeCountries),
                 icon: Icons.public_outlined,
               ),
             ),
@@ -449,7 +448,7 @@ class _DashboardPage extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: 'This Month Steps',
-                value: _formatNumber(data.globalStepsMonth),
+                value: _formatNumber(data.global.totalStepsThisMonth),
                 icon: Icons.bar_chart_outlined,
               ),
             ),
@@ -457,7 +456,7 @@ class _DashboardPage extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: 'CO₂ Saved',
-                value: '${_formatNumber(data.globalCo2Kg)} kg',
+                value: '${_formatNumberDouble(data.global.totalCo2KgSaved)} kg',
                 icon: Icons.forest_outlined,
               ),
             ),
@@ -470,7 +469,7 @@ class _DashboardPage extends StatelessWidget {
             children: [
               _SignalRow(
                 label: 'Monthly active teams',
-                value: _formatNumber(data.activeTeams),
+                value: _formatNumber(data.global.activeTeams),
               ),
               const SizedBox(height: 10),
               _SignalRow(
@@ -480,7 +479,7 @@ class _DashboardPage extends StatelessWidget {
               const SizedBox(height: 10),
               _SignalRow(
                 label: 'Reward reserve projection',
-                value: '¥${_formatNumber(data.rewardPoolYen)}',
+                value: '¥${_formatNumber(data.global.rewardPoolYen)}',
               ),
             ],
           ),
@@ -493,7 +492,7 @@ class _DashboardPage extends StatelessWidget {
 class _RankPage extends StatefulWidget {
   const _RankPage({required this.data});
 
-  final _AppSnapshot data;
+  final _HomeDemoState data;
 
   @override
   State<_RankPage> createState() => _RankPageState();
@@ -511,6 +510,22 @@ class _RankPageState extends State<_RankPage> {
       widget.data.cityRank,
       widget.data.teamRank,
     ];
+
+    final userPosition = _segment == 0
+        ? widget.data.user.worldRank ?? 0
+        : _segment == 1
+            ? widget.data.user.countryRank ?? 0
+            : _segment == 2
+                ? widget.data.user.cityRank ?? 0
+                : widget.data.user.teamRank ?? 0;
+
+    final userCaption = _segment == 0
+        ? 'World ranking'
+        : _segment == 1
+            ? '${widget.data.user.countryName} ranking'
+            : _segment == 2
+                ? '${widget.data.user.city} ranking'
+                : 'Team ranking';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
@@ -533,20 +548,8 @@ class _RankPageState extends State<_RankPage> {
         const SizedBox(height: 16),
         _SummaryRankCard(
           title: 'Your Position',
-          value: _segment == 0
-              ? '#${widget.data.userWorldRank}'
-              : _segment == 1
-                  ? '#${widget.data.userCountryRank}'
-                  : _segment == 2
-                      ? '#${widget.data.userCityRank}'
-                      : '#${widget.data.userTeamRank}',
-          caption: _segment == 0
-              ? 'World ranking'
-              : _segment == 1
-                  ? '${widget.data.country} ranking'
-                  : _segment == 2
-                      ? '${widget.data.city} ranking'
-                      : 'Team ranking',
+          value: '#$userPosition',
+          caption: userCaption,
         ),
         const SizedBox(height: 16),
         ...List.generate(
@@ -558,11 +561,11 @@ class _RankPageState extends State<_RankPage> {
                 bottom: index == lists[_segment].length - 1 ? 0 : 12,
               ),
               child: _RankTile(
-                rank: index + 1,
+                rank: entry.rank,
                 name: entry.name,
-                value: entry.value,
-                badge: entry.badge,
-                highlighted: entry.highlighted,
+                value: _formatNumber(entry.value),
+                badge: entry.label,
+                highlighted: entry.isCurrentUser,
               ),
             );
           },
@@ -575,7 +578,7 @@ class _RankPageState extends State<_RankPage> {
 class _AccountPage extends StatelessWidget {
   const _AccountPage({required this.data});
 
-  final _AppSnapshot data;
+  final _HomeDemoState data;
 
   @override
   Widget build(BuildContext context) {
@@ -592,13 +595,13 @@ class _AccountPage extends StatelessWidget {
           title: 'Profile',
           child: Column(
             children: [
-              _AccountRow(label: 'Email', value: data.email),
+              _AccountRow(label: 'Email', value: data.user.email),
               const SizedBox(height: 14),
-              _AccountRow(label: 'Country', value: data.country),
+              _AccountRow(label: 'Country', value: data.user.countryName),
               const SizedBox(height: 14),
-              _AccountRow(label: 'City', value: data.city),
+              _AccountRow(label: 'City', value: data.user.city),
               const SizedBox(height: 14),
-              _AccountRow(label: 'Plan', value: data.planName),
+              _AccountRow(label: 'Plan', value: _planLabel(data.user.plan)),
             ],
           ),
         ),
@@ -806,7 +809,7 @@ class _GlobeHero extends StatelessWidget {
 class _DashboardHero extends StatelessWidget {
   const _DashboardHero({required this.data});
 
-  final _AppSnapshot data;
+  final _HomeDemoState data;
 
   @override
   Widget build(BuildContext context) {
@@ -826,7 +829,7 @@ class _DashboardHero extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${_formatNumber(data.globalStepsToday)} steps',
+            '${_formatNumber(data.global.totalStepsToday)} steps',
             style: const TextStyle(
               color: Color(0xFFEAFBF2),
               fontSize: 32,
@@ -837,17 +840,17 @@ class _DashboardHero extends StatelessWidget {
           const SizedBox(height: 12),
           _MetricLine(
             label: 'Today CO₂ saved',
-            value: '${_formatNumber(data.globalCo2Kg)} kg',
+            value: '${_formatNumberDouble(data.global.totalCo2KgSaved)} kg',
           ),
           const SizedBox(height: 10),
           _MetricLine(
             label: 'Reward points minted',
-            value: _formatNumber(data.totalPrimePoints),
+            value: _formatNumber(data.global.totalPrimePoints),
           ),
           const SizedBox(height: 10),
           _MetricLine(
             label: 'Cities active',
-            value: _formatNumber(data.citiesActive),
+            value: _formatNumber(data.global.activeCities),
           ),
         ],
       ),
@@ -926,7 +929,7 @@ class _ProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = (current / goal).clamp(0.0, 1.0);
+    final progress = goal <= 0 ? 0.0 : (current / goal).clamp(0.0, 1.0);
 
     return Container(
       decoration: _panelDecoration(),
@@ -1580,203 +1583,309 @@ class _BottomBarItem {
   final IconData icon;
 }
 
-class _RankEntry {
-  const _RankEntry({
-    required this.name,
-    required this.value,
-    required this.badge,
-    this.highlighted = false,
-  });
-
-  final String name;
-  final String value;
-  final String badge;
-  final bool highlighted;
-}
-
-class _AppSnapshot {
-  const _AppSnapshot({
-    required this.email,
-    required this.country,
-    required this.city,
-    required this.planName,
-    required this.userStepsToday,
-    required this.userCo2Kg,
-    required this.userPrimePoints,
-    required this.userWorldRank,
-    required this.userCountryRank,
-    required this.userCityRank,
-    required this.userTeamRank,
-    required this.globalStepsToday,
-    required this.globalStepsMonth,
-    required this.globalCo2Kg,
-    required this.totalPrimePoints,
-    required this.activeWalkers,
-    required this.activeTeams,
-    required this.countriesActive,
-    required this.citiesActive,
-    required this.sponsorReadyUsers,
-    required this.rewardPoolYen,
-    required this.dailyGoalSteps,
-    required this.monthlyEventTitle,
-    required this.monthlyEventDescription,
-    required this.eventDaysLeft,
+class _HomeDemoState {
+  const _HomeDemoState({
+    required this.user,
+    required this.todaySummary,
+    required this.global,
+    required this.primaryTeam,
+    required this.friendsTeam,
+    required this.familyTeam,
+    required this.companyTeam,
     required this.worldRank,
     required this.countryRank,
     required this.cityRank,
     required this.teamRank,
+    required this.monthlyEventTitle,
+    required this.monthlyEventDescription,
+    required this.eventDaysLeft,
+    required this.sponsorReadyUsers,
   });
 
-  final String email;
-  final String country;
-  final String city;
-  final String planName;
-  final int userStepsToday;
-  final double userCo2Kg;
-  final int userPrimePoints;
-  final int userWorldRank;
-  final int userCountryRank;
-  final int userCityRank;
-  final int userTeamRank;
-  final int globalStepsToday;
-  final int globalStepsMonth;
-  final int globalCo2Kg;
-  final int totalPrimePoints;
-  final int activeWalkers;
-  final int activeTeams;
-  final int countriesActive;
-  final int citiesActive;
-  final int sponsorReadyUsers;
-  final int rewardPoolYen;
-  final int dailyGoalSteps;
+  final ZeronUser user;
+  final DailyImpactSummary todaySummary;
+  final GlobalImpactSnapshot global;
+  final TeamModel primaryTeam;
+  final TeamModel friendsTeam;
+  final TeamModel familyTeam;
+  final TeamModel companyTeam;
+  final List<RankEntryModel> worldRank;
+  final List<RankEntryModel> countryRank;
+  final List<RankEntryModel> cityRank;
+  final List<RankEntryModel> teamRank;
   final String monthlyEventTitle;
   final String monthlyEventDescription;
   final int eventDaysLeft;
-  final List<_RankEntry> worldRank;
-  final List<_RankEntry> countryRank;
-  final List<_RankEntry> cityRank;
-  final List<_RankEntry> teamRank;
+  final int sponsorReadyUsers;
 
-  factory _AppSnapshot.demo() {
-    return const _AppSnapshot(
+  factory _HomeDemoState.build() {
+    final now = DateTime.now();
+
+    final todaySummary = ZeronImpactCalculator.buildDailySummary(
+      dateKey: '2026-03-21',
+      totalSteps: 8420,
+      goalSteps: 10000,
+      hasDailyGoalBonus: false,
+      hasEventBoost: true,
+    );
+
+    final user = ZeronUser(
+      id: 'user_cocoro_demo',
       email: 'your.email@example.com',
-      country: 'Japan',
+      countryCode: 'JP',
+      countryName: 'Japan',
       city: 'Tokyo',
-      planName: 'Free',
-      userStepsToday: 8420,
-      userCo2Kg: 1.24,
-      userPrimePoints: 421,
-      userWorldRank: 124432,
-      userCountryRank: 1522,
-      userCityRank: 18,
-      userTeamRank: 4,
-      globalStepsToday: 4245332000,
-      globalStepsMonth: 91245000000,
-      globalCo2Kg: 845000,
-      totalPrimePoints: 15842000,
-      activeWalkers: 2340000,
+      plan: ZeronPlan.free,
+      termsAccepted: true,
+      createdAt: now.subtract(const Duration(days: 180)),
+      updatedAt: now,
+      displayName: 'Cocoro S.',
+      primaryTeamId: 'team_company_zeron_tokyo',
+      totalSteps: 1245820,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
+        1245820,
+      ),
+      totalPrimePoints: 58240,
+      todaySteps: todaySummary.totalSteps,
+      todayCo2KgSaved: todaySummary.totalCo2KgSaved,
+      todayPrimePoints: todaySummary.totalPrimePoints,
+      worldRank: 124432,
+      countryRank: 1522,
+      cityRank: 18,
+      teamRank: 4,
+    );
+
+    final friendsTeam = TeamModel(
+      id: 'team_friends',
+      name: 'Friends Team',
+      kind: TeamKind.friends,
+      ownerUserId: user.id,
+      memberCount: 12,
+      totalSteps: 53000,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(53000),
+      totalPrimePoints: 4820,
+      createdAt: now.subtract(const Duration(days: 80)),
+      updatedAt: now,
+      description: 'Close friends walking together for weekly impact.',
+      countryCode: 'JP',
+      city: 'Tokyo',
+    );
+
+    final familyTeam = TeamModel(
+      id: 'team_family',
+      name: 'Family Team',
+      kind: TeamKind.family,
+      ownerUserId: user.id,
+      memberCount: 5,
+      totalSteps: 47500,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(47500),
+      totalPrimePoints: 1940,
+      createdAt: now.subtract(const Duration(days: 120)),
+      updatedAt: now,
+      description: 'Family movement and shared health participation.',
+      countryCode: 'JP',
+      city: 'Tokyo',
+    );
+
+    final companyTeam = TeamModel(
+      id: 'team_company_zeron_tokyo',
+      name: 'Company Team',
+      kind: TeamKind.company,
+      ownerUserId: user.id,
+      memberCount: 48,
+      totalSteps: 38200,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(38200),
+      totalPrimePoints: 16300,
+      createdAt: now.subtract(const Duration(days: 160)),
+      updatedAt: now,
+      description: 'Workplace climate participation unit.',
+      countryCode: 'JP',
+      city: 'Tokyo',
+    );
+
+    final global = GlobalImpactSnapshot(
+      activeUsers: 2340000,
       activeTeams: 42550,
-      countriesActive: 118,
-      citiesActive: 3240,
-      sponsorReadyUsers: 684000,
+      activeCountries: 118,
+      activeCities: 3240,
+      totalStepsToday: 4245332000,
+      totalStepsThisMonth: 91245000000,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
+        4245332000,
+      ),
+      totalPrimePoints: 15842000,
       rewardPoolYen: 12500000,
-      dailyGoalSteps: 10000,
+      updatedAt: now,
+    );
+
+    final worldRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'world_1',
+        scope: RankScope.world,
+        rank: 1,
+        name: 'neo.rearri@example.com',
+        value: 124432,
+        label: 'Top global walker',
+      ),
+      RankEntryModel(
+        id: 'world_2',
+        scope: RankScope.world,
+        rank: 2,
+        name: user.displayName ?? 'You',
+        value: user.todaySteps,
+        label: 'ZERON Tokyo',
+        isCurrentUser: true,
+        relatedUserId: user.id,
+      ),
+      const RankEntryModel(
+        id: 'world_3',
+        scope: RankScope.world,
+        rank: 3,
+        name: 'Aster Vale',
+        value: 8118,
+        label: 'United States',
+      ),
+      const RankEntryModel(
+        id: 'world_4',
+        scope: RankScope.world,
+        rank: 4,
+        name: 'Eon Loop',
+        value: 7980,
+        label: 'Germany',
+      ),
+    ];
+
+    final countryRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'country_1',
+        scope: RankScope.country,
+        rank: 1,
+        name: 'Japan',
+        value: 4245332000,
+        label: 'Country steps rank',
+      ),
+      RankEntryModel(
+        id: 'country_2',
+        scope: RankScope.country,
+        rank: 2,
+        name: user.displayName ?? 'You',
+        value: user.todaySteps,
+        label: 'Tokyo',
+        isCurrentUser: true,
+        relatedUserId: user.id,
+      ),
+      const RankEntryModel(
+        id: 'country_3',
+        scope: RankScope.country,
+        rank: 3,
+        name: 'Kyoto Walker',
+        value: 8050,
+        label: 'Kyoto',
+      ),
+      const RankEntryModel(
+        id: 'country_4',
+        scope: RankScope.country,
+        rank: 4,
+        name: 'Sapporo Run',
+        value: 7944,
+        label: 'Sapporo',
+      ),
+    ];
+
+    final cityRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'city_1',
+        scope: RankScope.city,
+        rank: 1,
+        name: 'Tokyo',
+        value: 18,
+        label: 'City position',
+      ),
+      RankEntryModel(
+        id: 'city_2',
+        scope: RankScope.city,
+        rank: 2,
+        name: user.displayName ?? 'You',
+        value: user.todaySteps,
+        label: 'Tokyo rank #18',
+        isCurrentUser: true,
+        relatedUserId: user.id,
+      ),
+      const RankEntryModel(
+        id: 'city_3',
+        scope: RankScope.city,
+        rank: 3,
+        name: 'Minato Walker',
+        value: 8310,
+        label: 'Tokyo',
+      ),
+      const RankEntryModel(
+        id: 'city_4',
+        scope: RankScope.city,
+        rank: 4,
+        name: 'Shibuya Pulse',
+        value: 8088,
+        label: 'Tokyo',
+      ),
+    ];
+
+    final teamRank = <RankEntryModel>[
+      RankEntryModel(
+        id: 'team_1',
+        scope: RankScope.team,
+        rank: 1,
+        name: friendsTeam.name,
+        value: friendsTeam.totalSteps,
+        label: 'Team steps',
+        relatedTeamId: friendsTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_2',
+        scope: RankScope.team,
+        rank: 2,
+        name: familyTeam.name,
+        value: familyTeam.totalSteps,
+        label: 'Team steps',
+        relatedTeamId: familyTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_3',
+        scope: RankScope.team,
+        rank: 3,
+        name: companyTeam.name,
+        value: 41500,
+        label: 'Team steps',
+        relatedTeamId: companyTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_4',
+        scope: RankScope.team,
+        rank: 4,
+        name: 'ZERON Tokyo',
+        value: companyTeam.totalSteps,
+        label: 'Your current team',
+        isCurrentUser: true,
+        relatedTeamId: companyTeam.id,
+      ),
+    ];
+
+    return _HomeDemoState(
+      user: user,
+      todaySummary: todaySummary,
+      global: global,
+      primaryTeam: companyTeam,
+      friendsTeam: friendsTeam,
+      familyTeam: familyTeam,
+      companyTeam: companyTeam,
+      worldRank: worldRank,
+      countryRank: countryRank,
+      cityRank: cityRank,
+      teamRank: teamRank,
       monthlyEventTitle: 'March Earth Pulse',
       monthlyEventDescription:
           'Walk together to unlock sponsor-backed reward tiers and global city rankings.',
       eventDaysLeft: 11,
-      worldRank: [
-        _RankEntry(
-          name: 'neo.rearri@example.com',
-          value: '124,432',
-          badge: 'Top global walker',
-        ),
-        _RankEntry(
-          name: 'Cocoro S.',
-          value: '8,420',
-          badge: 'ZERON Tokyo',
-          highlighted: true,
-        ),
-        _RankEntry(
-          name: 'Aster Vale',
-          value: '8,118',
-          badge: 'United States',
-        ),
-        _RankEntry(
-          name: 'Eon Loop',
-          value: '7,980',
-          badge: 'Germany',
-        ),
-      ],
-      countryRank: [
-        _RankEntry(
-          name: 'Japan',
-          value: '4,245,332,000',
-          badge: 'Country steps rank',
-        ),
-        _RankEntry(
-          name: 'Cocoro S.',
-          value: '8,420',
-          badge: 'Tokyo',
-          highlighted: true,
-        ),
-        _RankEntry(
-          name: 'Kyoto Walker',
-          value: '8,050',
-          badge: 'Kyoto',
-        ),
-        _RankEntry(
-          name: 'Sapporo Run',
-          value: '7,944',
-          badge: 'Sapporo',
-        ),
-      ],
-      cityRank: [
-        _RankEntry(
-          name: 'Tokyo',
-          value: '18',
-          badge: 'City position',
-        ),
-        _RankEntry(
-          name: 'Cocoro S.',
-          value: '8,420',
-          badge: 'Tokyo rank #18',
-          highlighted: true,
-        ),
-        _RankEntry(
-          name: 'Minato Walker',
-          value: '8,310',
-          badge: 'Tokyo',
-        ),
-        _RankEntry(
-          name: 'Shibuya Pulse',
-          value: '8,088',
-          badge: 'Tokyo',
-        ),
-      ],
-      teamRank: [
-        _RankEntry(
-          name: 'Friends Team',
-          value: '53,000',
-          badge: 'Team steps',
-        ),
-        _RankEntry(
-          name: 'Family Team',
-          value: '47,500',
-          badge: 'Team steps',
-        ),
-        _RankEntry(
-          name: 'Company Team',
-          value: '41,500',
-          badge: 'Team steps',
-        ),
-        _RankEntry(
-          name: 'ZERON Tokyo',
-          value: '38,200',
-          badge: 'Your current team',
-          highlighted: true,
-        ),
-      ],
+      sponsorReadyUsers: 684000,
     );
   }
 }
@@ -1912,6 +2021,17 @@ BoxDecoration _panelDecoration({bool highlighted = false}) {
   );
 }
 
+String _planLabel(ZeronPlan plan) {
+  switch (plan) {
+    case ZeronPlan.free:
+      return 'Free';
+    case ZeronPlan.plus:
+      return 'ZERON+';
+    case ZeronPlan.sponsor:
+      return 'Sponsor';
+  }
+}
+
 String _formatNumber(int value) {
   final source = value.abs().toString();
   final buffer = StringBuffer();
@@ -1924,4 +2044,8 @@ String _formatNumber(int value) {
   }
   final result = buffer.toString();
   return value < 0 ? '-$result' : result;
+}
+
+String _formatNumberDouble(double value) {
+  return _formatNumber(value.round());
 }
