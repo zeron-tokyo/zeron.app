@@ -305,22 +305,38 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
   late int _eventDaysLeft;
   late int _sponsorReadyUsers;
 
+  late int _baseTotalSteps;
+  late double _baseTotalCo2KgSaved;
+  late int _baseTotalPrimePoints;
+
+  StreamSubscription<int>? _stepSubscription;
+
   @override
   void initState() {
     super.initState();
+    StepService.init();
     _initData();
+    _bindStepStream();
+  }
+
+  @override
+  void dispose() {
+    _stepSubscription?.cancel();
+    super.dispose();
   }
 
   void _initData() {
     final now = DateTime.now();
-    final steps = StepService.generateTodaySteps();
 
-    _todaySummary = StepService.buildTodaySummary(
-      steps: steps,
-      goalSteps: 10000,
+    _baseTotalSteps = 1245820;
+    _baseTotalCo2KgSaved = ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
+      _baseTotalSteps,
     );
+    _baseTotalPrimePoints = 58240;
 
-    final baseUser = ZeronUser(
+    _todaySummary = StepService.buildSummary(0);
+
+    _user = ZeronUser(
       id: 'user_cocoro_demo',
       email: 'your.email@example.com',
       countryCode: 'JP',
@@ -332,21 +348,16 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       updatedAt: now,
       displayName: 'Cocoro S.',
       primaryTeamId: 'team_company_zeron_tokyo',
+      totalSteps: _baseTotalSteps,
+      totalCo2KgSaved: _baseTotalCo2KgSaved,
+      totalPrimePoints: _baseTotalPrimePoints,
+      todaySteps: 0,
+      todayCo2KgSaved: 0,
+      todayPrimePoints: 0,
       worldRank: 124432,
       countryRank: 1522,
       cityRank: 18,
       teamRank: 4,
-    );
-
-    _user = StepService.applyTodayUpdate(
-      user: baseUser.copyWith(
-        totalSteps: 1245820,
-        totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
-          1245820,
-        ),
-        totalPrimePoints: 58240,
-      ),
-      todaySteps: steps,
     );
 
     _friendsTeam = TeamModel(
@@ -570,6 +581,147 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         'Walk together to unlock sponsor-backed reward tiers and global city rankings.';
     _eventDaysLeft = 11;
     _sponsorReadyUsers = 684000;
+  }
+
+  void _bindStepStream() {
+    _stepSubscription = StepService.stepStream.listen((steps) {
+      if (!mounted) return;
+
+      final summary = StepService.buildSummary(steps);
+      final updatedUser = _buildUserFromSummary(summary);
+
+      setState(() {
+        _todaySummary = summary;
+        _user = updatedUser;
+        _refreshRanks();
+      });
+    });
+  }
+
+  ZeronUser _buildUserFromSummary(DailyImpactSummary summary) {
+    return _user.copyWith(
+      todaySteps: summary.totalSteps,
+      todayCo2KgSaved: summary.totalCo2KgSaved,
+      todayPrimePoints: summary.totalPrimePoints,
+      totalSteps: _baseTotalSteps + summary.totalSteps,
+      totalCo2KgSaved: _baseTotalCo2KgSaved + summary.totalCo2KgSaved,
+      totalPrimePoints: _baseTotalPrimePoints + summary.totalPrimePoints,
+      updatedAt: DateTime.now(),
+      lastActiveAt: DateTime.now(),
+    );
+  }
+
+  void _refreshRanks() {
+    _worldRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'world_1',
+        scope: RankScope.world,
+        rank: 1,
+        name: 'neo.rearri@example.com',
+        value: 124432,
+        label: 'Top global walker',
+      ),
+      RankEntryModel(
+        id: 'world_2',
+        scope: RankScope.world,
+        rank: 2,
+        name: _user.displayName ?? 'You',
+        value: _user.todaySteps,
+        label: 'ZERON Tokyo',
+        isCurrentUser: true,
+        relatedUserId: _user.id,
+      ),
+      const RankEntryModel(
+        id: 'world_3',
+        scope: RankScope.world,
+        rank: 3,
+        name: 'Aster Vale',
+        value: 8118,
+        label: 'United States',
+      ),
+      const RankEntryModel(
+        id: 'world_4',
+        scope: RankScope.world,
+        rank: 4,
+        name: 'Eon Loop',
+        value: 7980,
+        label: 'Germany',
+      ),
+    ];
+
+    _countryRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'country_1',
+        scope: RankScope.country,
+        rank: 1,
+        name: 'Japan',
+        value: 4245332000,
+        label: 'Country steps rank',
+      ),
+      RankEntryModel(
+        id: 'country_2',
+        scope: RankScope.country,
+        rank: 2,
+        name: _user.displayName ?? 'You',
+        value: _user.todaySteps,
+        label: 'Tokyo',
+        isCurrentUser: true,
+        relatedUserId: _user.id,
+      ),
+      const RankEntryModel(
+        id: 'country_3',
+        scope: RankScope.country,
+        rank: 3,
+        name: 'Kyoto Walker',
+        value: 8050,
+        label: 'Kyoto',
+      ),
+      const RankEntryModel(
+        id: 'country_4',
+        scope: RankScope.country,
+        rank: 4,
+        name: 'Sapporo Run',
+        value: 7944,
+        label: 'Sapporo',
+      ),
+    ];
+
+    _cityRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'city_1',
+        scope: RankScope.city,
+        rank: 1,
+        name: 'Tokyo',
+        value: 18,
+        label: 'City position',
+      ),
+      RankEntryModel(
+        id: 'city_2',
+        scope: RankScope.city,
+        rank: 2,
+        name: _user.displayName ?? 'You',
+        value: _user.todaySteps,
+        label: 'Tokyo rank #18',
+        isCurrentUser: true,
+        relatedUserId: _user.id,
+      ),
+      const RankEntryModel(
+        id: 'city_3',
+        scope: RankScope.city,
+        rank: 3,
+        name: 'Minato Walker',
+        value: 8310,
+        label: 'Tokyo',
+      ),
+      const RankEntryModel(
+        id: 'city_4',
+        scope: RankScope.city,
+        rank: 4,
+        name: 'Shibuya Pulse',
+        value: 8088,
+        label: 'Tokyo',
+      ),
+    ];
   }
 
   _HomeDemoState _viewState() {

@@ -12,6 +12,8 @@ dependencies:
     sdk: flutter
   shared_preferences: ^2.2.3
   cupertino_icons: ^1.0.8
+  pedometer: ^4.0.1
+  permission_handler: ^11.0.1
 
 dev_dependencies:
   flutter_test:
