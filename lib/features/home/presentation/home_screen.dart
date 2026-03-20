@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zeron/core/models/app_models.dart';
+import 'package:zeron/core/services/step_service.dart';
 import 'package:zeron/features/team/presentation/team_screen.dart';
 import 'package:zeron/widgets/zeron_background.dart';
 import 'package:zeron/widgets/zeron_distortion.dart';
@@ -288,16 +289,319 @@ class _ZeronMainShell extends StatefulWidget {
 class _ZeronMainShellState extends State<_ZeronMainShell> {
   int _currentIndex = 0;
 
-  late final _HomeDemoState _demo = _HomeDemoState.build();
+  late ZeronUser _user;
+  late DailyImpactSummary _todaySummary;
+  late GlobalImpactSnapshot _global;
+  late TeamModel _primaryTeam;
+  late TeamModel _friendsTeam;
+  late TeamModel _familyTeam;
+  late TeamModel _companyTeam;
+  late List<RankEntryModel> _worldRank;
+  late List<RankEntryModel> _countryRank;
+  late List<RankEntryModel> _cityRank;
+  late List<RankEntryModel> _teamRank;
+  late String _monthlyEventTitle;
+  late String _monthlyEventDescription;
+  late int _eventDaysLeft;
+  late int _sponsorReadyUsers;
+
+  @override
+  void initState() {
+    super.initState();
+    _initData();
+  }
+
+  void _initData() {
+    final now = DateTime.now();
+    final steps = StepService.generateTodaySteps();
+
+    _todaySummary = StepService.buildTodaySummary(
+      steps: steps,
+      goalSteps: 10000,
+    );
+
+    final baseUser = ZeronUser(
+      id: 'user_cocoro_demo',
+      email: 'your.email@example.com',
+      countryCode: 'JP',
+      countryName: 'Japan',
+      city: 'Tokyo',
+      plan: ZeronPlan.free,
+      termsAccepted: true,
+      createdAt: now.subtract(const Duration(days: 180)),
+      updatedAt: now,
+      displayName: 'Cocoro S.',
+      primaryTeamId: 'team_company_zeron_tokyo',
+      worldRank: 124432,
+      countryRank: 1522,
+      cityRank: 18,
+      teamRank: 4,
+    );
+
+    _user = StepService.applyTodayUpdate(
+      user: baseUser.copyWith(
+        totalSteps: 1245820,
+        totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
+          1245820,
+        ),
+        totalPrimePoints: 58240,
+      ),
+      todaySteps: steps,
+    );
+
+    _friendsTeam = TeamModel(
+      id: 'team_friends',
+      name: 'Friends Team',
+      kind: TeamKind.friends,
+      ownerUserId: _user.id,
+      memberCount: 12,
+      totalSteps: 53000,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(53000),
+      totalPrimePoints: 4820,
+      createdAt: now.subtract(const Duration(days: 80)),
+      updatedAt: now,
+      description: 'Close friends walking together for weekly impact.',
+      countryCode: 'JP',
+      city: 'Tokyo',
+    );
+
+    _familyTeam = TeamModel(
+      id: 'team_family',
+      name: 'Family Team',
+      kind: TeamKind.family,
+      ownerUserId: _user.id,
+      memberCount: 5,
+      totalSteps: 47500,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(47500),
+      totalPrimePoints: 1940,
+      createdAt: now.subtract(const Duration(days: 120)),
+      updatedAt: now,
+      description: 'Family movement and shared health participation.',
+      countryCode: 'JP',
+      city: 'Tokyo',
+    );
+
+    _companyTeam = TeamModel(
+      id: 'team_company_zeron_tokyo',
+      name: 'Company Team',
+      kind: TeamKind.company,
+      ownerUserId: _user.id,
+      memberCount: 48,
+      totalSteps: 38200,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(38200),
+      totalPrimePoints: 16300,
+      createdAt: now.subtract(const Duration(days: 160)),
+      updatedAt: now,
+      description: 'Workplace climate participation unit.',
+      countryCode: 'JP',
+      city: 'Tokyo',
+    );
+
+    _primaryTeam = _companyTeam;
+
+    _global = GlobalImpactSnapshot(
+      activeUsers: 2340000,
+      activeTeams: 42550,
+      activeCountries: 118,
+      activeCities: 3240,
+      totalStepsToday: 4245332000,
+      totalStepsThisMonth: 91245000000,
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
+        4245332000,
+      ),
+      totalPrimePoints: 15842000,
+      rewardPoolYen: 12500000,
+      updatedAt: now,
+    );
+
+    _worldRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'world_1',
+        scope: RankScope.world,
+        rank: 1,
+        name: 'neo.rearri@example.com',
+        value: 124432,
+        label: 'Top global walker',
+      ),
+      RankEntryModel(
+        id: 'world_2',
+        scope: RankScope.world,
+        rank: 2,
+        name: _user.displayName ?? 'You',
+        value: _user.todaySteps,
+        label: 'ZERON Tokyo',
+        isCurrentUser: true,
+        relatedUserId: _user.id,
+      ),
+      const RankEntryModel(
+        id: 'world_3',
+        scope: RankScope.world,
+        rank: 3,
+        name: 'Aster Vale',
+        value: 8118,
+        label: 'United States',
+      ),
+      const RankEntryModel(
+        id: 'world_4',
+        scope: RankScope.world,
+        rank: 4,
+        name: 'Eon Loop',
+        value: 7980,
+        label: 'Germany',
+      ),
+    ];
+
+    _countryRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'country_1',
+        scope: RankScope.country,
+        rank: 1,
+        name: 'Japan',
+        value: 4245332000,
+        label: 'Country steps rank',
+      ),
+      RankEntryModel(
+        id: 'country_2',
+        scope: RankScope.country,
+        rank: 2,
+        name: _user.displayName ?? 'You',
+        value: _user.todaySteps,
+        label: 'Tokyo',
+        isCurrentUser: true,
+        relatedUserId: _user.id,
+      ),
+      const RankEntryModel(
+        id: 'country_3',
+        scope: RankScope.country,
+        rank: 3,
+        name: 'Kyoto Walker',
+        value: 8050,
+        label: 'Kyoto',
+      ),
+      const RankEntryModel(
+        id: 'country_4',
+        scope: RankScope.country,
+        rank: 4,
+        name: 'Sapporo Run',
+        value: 7944,
+        label: 'Sapporo',
+      ),
+    ];
+
+    _cityRank = <RankEntryModel>[
+      const RankEntryModel(
+        id: 'city_1',
+        scope: RankScope.city,
+        rank: 1,
+        name: 'Tokyo',
+        value: 18,
+        label: 'City position',
+      ),
+      RankEntryModel(
+        id: 'city_2',
+        scope: RankScope.city,
+        rank: 2,
+        name: _user.displayName ?? 'You',
+        value: _user.todaySteps,
+        label: 'Tokyo rank #18',
+        isCurrentUser: true,
+        relatedUserId: _user.id,
+      ),
+      const RankEntryModel(
+        id: 'city_3',
+        scope: RankScope.city,
+        rank: 3,
+        name: 'Minato Walker',
+        value: 8310,
+        label: 'Tokyo',
+      ),
+      const RankEntryModel(
+        id: 'city_4',
+        scope: RankScope.city,
+        rank: 4,
+        name: 'Shibuya Pulse',
+        value: 8088,
+        label: 'Tokyo',
+      ),
+    ];
+
+    _teamRank = <RankEntryModel>[
+      RankEntryModel(
+        id: 'team_1',
+        scope: RankScope.team,
+        rank: 1,
+        name: _friendsTeam.name,
+        value: _friendsTeam.totalSteps,
+        label: 'Team steps',
+        relatedTeamId: _friendsTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_2',
+        scope: RankScope.team,
+        rank: 2,
+        name: _familyTeam.name,
+        value: _familyTeam.totalSteps,
+        label: 'Team steps',
+        relatedTeamId: _familyTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_3',
+        scope: RankScope.team,
+        rank: 3,
+        name: _companyTeam.name,
+        value: 41500,
+        label: 'Team steps',
+        relatedTeamId: _companyTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_4',
+        scope: RankScope.team,
+        rank: 4,
+        name: 'ZERON Tokyo',
+        value: _companyTeam.totalSteps,
+        label: 'Your current team',
+        isCurrentUser: true,
+        relatedTeamId: _companyTeam.id,
+      ),
+    ];
+
+    _monthlyEventTitle = 'March Earth Pulse';
+    _monthlyEventDescription =
+        'Walk together to unlock sponsor-backed reward tiers and global city rankings.';
+    _eventDaysLeft = 11;
+    _sponsorReadyUsers = 684000;
+  }
+
+  _HomeDemoState _viewState() {
+    return _HomeDemoState(
+      user: _user,
+      todaySummary: _todaySummary,
+      global: _global,
+      primaryTeam: _primaryTeam,
+      friendsTeam: _friendsTeam,
+      familyTeam: _familyTeam,
+      companyTeam: _companyTeam,
+      worldRank: _worldRank,
+      countryRank: _countryRank,
+      cityRank: _cityRank,
+      teamRank: _teamRank,
+      monthlyEventTitle: _monthlyEventTitle,
+      monthlyEventDescription: _monthlyEventDescription,
+      eventDaysLeft: _eventDaysLeft,
+      sponsorReadyUsers: _sponsorReadyUsers,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final data = _viewState();
+
     final pages = <Widget>[
-      _TodayPage(data: _demo),
-      _DashboardPage(data: _demo),
-      _RankPage(data: _demo),
+      _TodayPage(data: data),
+      _DashboardPage(data: data),
+      _RankPage(data: data),
       const TeamScreen(),
-      _AccountPage(data: _demo),
+      _AccountPage(data: data),
     ];
 
     return Container(
@@ -366,7 +670,8 @@ class _TodayPage extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: 'CO₂ Saved',
-                value: '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
+                value:
+                    '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
                 icon: Icons.eco_outlined,
               ),
             ),
