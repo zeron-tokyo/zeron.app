@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:zeron/features/team/presentation/team_screen.dart';
 import 'package:zeron/widgets/zeron_background.dart';
 import 'package:zeron/widgets/zeron_distortion.dart';
 import 'package:zeron/widgets/zeron_glow.dart';
@@ -294,6 +295,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       _TodayPage(data: _data),
       _DashboardPage(data: _data),
       _RankPage(data: _data),
+      const TeamScreen(),
       _AccountPage(data: _data),
     ];
 
@@ -1426,6 +1428,7 @@ class _BottomBar extends StatelessWidget {
       const _BottomBarItem('Today', Icons.home_filled),
       const _BottomBarItem('Dashboard', Icons.public),
       const _BottomBarItem('Rank', Icons.bar_chart_rounded),
+      const _BottomBarItem('Team', Icons.groups),
       const _BottomBarItem('Account', Icons.person_rounded),
     ];
 
