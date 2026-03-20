@@ -7,7 +7,6 @@ import 'package:zeron/app/zeron_app.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // グローバルエラーハンドリング
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
   };

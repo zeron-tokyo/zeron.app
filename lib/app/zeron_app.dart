@@ -6,15 +6,17 @@ class ZeronApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const Color baseBlack = Colors.black;
-    const Color softWhite = Color(0xFFF5F5F5);
+    const Color baseBlack = Color(0xFF020406);
+    const Color panel = Color(0xFF0A1115);
+    const Color softWhite = Color(0xFFF3FBF7);
+    const Color mint = Color(0xFFB8FFE3);
 
     final ThemeData theme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: baseBlack,
       canvasColor: baseBlack,
-      cardColor: baseBlack,
+      cardColor: panel,
       dividerColor: Colors.white10,
       splashFactory: NoSplash.splashFactory,
       splashColor: Colors.transparent,
@@ -30,8 +32,8 @@ class ZeronApp extends StatelessWidget {
         'sans-serif',
       ],
       colorScheme: const ColorScheme.dark(
-        surface: baseBlack,
-        primary: softWhite,
+        surface: panel,
+        primary: mint,
         secondary: softWhite,
         onPrimary: baseBlack,
         onSecondary: baseBlack,
@@ -43,7 +45,7 @@ class ZeronApp extends StatelessWidget {
         selectionHandleColor: softWhite,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: baseBlack,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -52,7 +54,7 @@ class ZeronApp extends StatelessWidget {
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
-          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
