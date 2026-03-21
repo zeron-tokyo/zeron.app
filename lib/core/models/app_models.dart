@@ -1,177 +1,335 @@
 import 'dart:math';
 
-import 'package:zeron/core/models/app_models.dart';
+/// ===============================
+/// ENUM
+/// ===============================
 
-class StepService {
-  const StepService._();
+enum ZeronPlan { free, plus, sponsor }
 
-  static final Random _random = Random();
+enum TeamKind { friends, family, company }
 
-  /// ===============================
-  /// 仮歩数生成（リアル挙動）
-  /// ===============================
-  static int generateTodaySteps() {
-    final hour = DateTime.now().hour;
+enum RankScope { world, country, city, team }
 
-    int base;
+/// ===============================
+/// USER
+/// ===============================
 
-    if (hour < 6) {
-      base = _random.nextInt(300); // 深夜
-    } else if (hour < 10) {
-      base = 500 + _random.nextInt(1500); // 朝
-    } else if (hour < 15) {
-      base = 2000 + _random.nextInt(4000); // 昼
-    } else if (hour < 20) {
-      base = 4000 + _random.nextInt(6000); // 夕方ピーク
-    } else {
-      base = 5000 + _random.nextInt(8000); // 夜
-    }
+class ZeronUser {
+  final String id;
+  final String email;
+  final String countryCode;
+  final String countryName;
+  final String city;
 
-    return base;
-  }
+  final ZeronPlan plan;
+  final bool termsAccepted;
 
-  /// ===============================
-  /// 日付キー生成
-  /// ===============================
-  static String generateDateKey(DateTime date) {
-    return "${date.year.toString().padLeft(4, '0')}"
-        "${date.month.toString().padLeft(2, '0')}"
-        "${date.day.toString().padLeft(2, '0')}";
-  }
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? lastActiveAt;
 
-  /// ===============================
-  /// StepRecord生成
-  /// ===============================
-  static StepRecord buildStepRecord({
-    required String userId,
-    required int steps,
-    String source = "simulated",
+  final String? displayName;
+  final String? primaryTeamId;
+
+  final int totalSteps;
+  final double totalCo2KgSaved;
+  final int totalPrimePoints;
+
+  final int todaySteps;
+  final double todayCo2KgSaved;
+  final int todayPrimePoints;
+
+  final int? worldRank;
+  final int? countryRank;
+  final int? cityRank;
+  final int? teamRank;
+
+  const ZeronUser({
+    required this.id,
+    required this.email,
+    required this.countryCode,
+    required this.countryName,
+    required this.city,
+    required this.plan,
+    required this.termsAccepted,
+    required this.createdAt,
+    required this.updatedAt,
+    this.lastActiveAt,
+    this.displayName,
+    this.primaryTeamId,
+    required this.totalSteps,
+    required this.totalCo2KgSaved,
+    required this.totalPrimePoints,
+    required this.todaySteps,
+    required this.todayCo2KgSaved,
+    required this.todayPrimePoints,
+    this.worldRank,
+    this.countryRank,
+    this.cityRank,
+    this.teamRank,
+  });
+
+  ZeronUser copyWith({
+    int? todaySteps,
+    double? todayCo2KgSaved,
+    int? todayPrimePoints,
+    int? totalSteps,
+    double? totalCo2KgSaved,
+    int? totalPrimePoints,
+    DateTime? updatedAt,
+    DateTime? lastActiveAt,
   }) {
-    final now = DateTime.now();
-    final dateKey = generateDateKey(now);
+    return ZeronUser(
+      id: id,
+      email: email,
+      countryCode: countryCode,
+      countryName: countryName,
+      city: city,
+      plan: plan,
+      termsAccepted: termsAccepted,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+      displayName: displayName,
+      primaryTeamId: primaryTeamId,
+      totalSteps: totalSteps ?? this.totalSteps,
+      totalCo2KgSaved: totalCo2KgSaved ?? this.totalCo2KgSaved,
+      totalPrimePoints: totalPrimePoints ?? this.totalPrimePoints,
+      todaySteps: todaySteps ?? this.todaySteps,
+      todayCo2KgSaved: todayCo2KgSaved ?? this.todayCo2KgSaved,
+      todayPrimePoints: todayPrimePoints ?? this.todayPrimePoints,
+      worldRank: worldRank,
+      countryRank: countryRank,
+      cityRank: cityRank,
+      teamRank: teamRank,
+    );
+  }
+}
 
-    final distance =
-        ZeronImpactCalculator.calculateDistanceKmFromSteps(steps);
+/// ===============================
+/// STEP RECORD
+/// ===============================
 
-    final co2 =
-        ZeronImpactCalculator.calculateCo2KgSavedFromDistance(distance);
+class StepRecord {
+  final String id;
+  final String userId;
+  final String dateKey;
 
-    final isGoal = steps >= 8000;
+  final int stepCount;
+  final double distanceKm;
+  final double co2KgSaved;
+  final int primePoints;
 
-    final points = ZeronImpactCalculator.calculatePrimePoints(
-      steps: steps,
+  final String source;
+
+  final DateTime recordedAt;
+  final DateTime updatedAt;
+
+  final double avgSpeedKmh;
+  final bool isValidated;
+
+  const StepRecord({
+    required this.id,
+    required this.userId,
+    required this.dateKey,
+    required this.stepCount,
+    required this.distanceKm,
+    required this.co2KgSaved,
+    required this.primePoints,
+    required this.source,
+    required this.recordedAt,
+    required this.updatedAt,
+    required this.avgSpeedKmh,
+    required this.isValidated,
+  });
+}
+
+/// ===============================
+/// DAILY SUMMARY
+/// ===============================
+
+class DailyImpactSummary {
+  final String dateKey;
+  final int totalSteps;
+  final int goalSteps;
+
+  final double totalCo2KgSaved;
+  final int totalPrimePoints;
+
+  final bool hasDailyGoalBonus;
+
+  /// UI用
+  double get goalProgress =>
+      goalSteps == 0 ? 0 : (totalSteps / goalSteps).clamp(0.0, 1.0);
+
+  const DailyImpactSummary({
+    required this.dateKey,
+    required this.totalSteps,
+    required this.goalSteps,
+    required this.totalCo2KgSaved,
+    required this.totalPrimePoints,
+    required this.hasDailyGoalBonus,
+  });
+}
+
+/// ===============================
+/// TEAM
+/// ===============================
+
+class TeamModel {
+  final String id;
+  final String name;
+  final TeamKind kind;
+  final String ownerUserId;
+
+  final int memberCount;
+  final int totalSteps;
+  final double totalCo2KgSaved;
+  final int totalPrimePoints;
+
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  final String? description;
+  final String? countryCode;
+  final String? city;
+
+  const TeamModel({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.ownerUserId,
+    required this.memberCount,
+    required this.totalSteps,
+    required this.totalCo2KgSaved,
+    required this.totalPrimePoints,
+    required this.createdAt,
+    required this.updatedAt,
+    this.description,
+    this.countryCode,
+    this.city,
+  });
+}
+
+/// ===============================
+/// GLOBAL SNAPSHOT
+/// ===============================
+
+class GlobalImpactSnapshot {
+  final int activeUsers;
+  final int activeTeams;
+  final int activeCountries;
+  final int activeCities;
+
+  final int totalStepsToday;
+  final int totalStepsThisMonth;
+
+  final double totalCo2KgSaved;
+  final int totalPrimePoints;
+
+  final int rewardPoolYen;
+
+  final DateTime updatedAt;
+
+  const GlobalImpactSnapshot({
+    required this.activeUsers,
+    required this.activeTeams,
+    required this.activeCountries,
+    required this.activeCities,
+    required this.totalStepsToday,
+    required this.totalStepsThisMonth,
+    required this.totalCo2KgSaved,
+    required this.totalPrimePoints,
+    required this.rewardPoolYen,
+    required this.updatedAt,
+  });
+}
+
+/// ===============================
+/// RANK
+/// ===============================
+
+class RankEntryModel {
+  final String id;
+  final RankScope scope;
+  final int rank;
+
+  final String name;
+  final int value;
+  final String label;
+
+  final bool isCurrentUser;
+
+  final String? relatedUserId;
+  final String? relatedTeamId;
+
+  const RankEntryModel({
+    required this.id,
+    required this.scope,
+    required this.rank,
+    required this.name,
+    required this.value,
+    required this.label,
+    this.isCurrentUser = false,
+    this.relatedUserId,
+    this.relatedTeamId,
+  });
+}
+
+/// ===============================
+/// IMPACT CALCULATOR（中核）
+/// ===============================
+
+class ZeronImpactCalculator {
+  static const double _stepLengthKm = 0.00075;
+  static const double _co2PerKm = 0.12;
+
+  static double calculateDistanceKmFromSteps(int steps) {
+    return steps * _stepLengthKm;
+  }
+
+  static double calculateCo2KgSavedFromSteps(int steps) {
+    final distance = calculateDistanceKmFromSteps(steps);
+    return calculateCo2KgSavedFromDistance(distance);
+  }
+
+  static double calculateCo2KgSavedFromDistance(double distanceKm) {
+    return distanceKm * _co2PerKm;
+  }
+
+  static int calculatePrimePoints({
+    required int steps,
+    required double co2KgSaved,
+    required bool hasDailyGoalBonus,
+  }) {
+    final base = (steps * 0.01).floor();
+    final co2Bonus = (co2KgSaved * 10).floor();
+    final goalBonus = hasDailyGoalBonus ? 100 : 0;
+
+    return base + co2Bonus + goalBonus;
+  }
+
+  static DailyImpactSummary buildDailySummary({
+    required String dateKey,
+    required int totalSteps,
+    required int goalSteps,
+    required bool hasDailyGoalBonus,
+  }) {
+    final co2 = calculateCo2KgSavedFromSteps(totalSteps);
+
+    final points = calculatePrimePoints(
+      steps: totalSteps,
       co2KgSaved: co2,
-      hasDailyGoalBonus: isGoal,
+      hasDailyGoalBonus: hasDailyGoalBonus,
     );
 
-    return StepRecord(
-      id: _generateId(),
-      userId: userId,
+    return DailyImpactSummary(
       dateKey: dateKey,
-      stepCount: steps,
-      distanceKm: distance,
-      co2KgSaved: co2,
-      primePoints: points,
-      source: source,
-      recordedAt: now,
-      updatedAt: now,
-      avgSpeedKmh: _estimateSpeed(steps),
-      isValidated: true,
-    );
-  }
-
-  /// ===============================
-  /// DailySummary生成
-  /// ===============================
-  static DailyImpactSummary buildTodaySummary({
-    required int steps,
-    int goalSteps = 8000,
-  }) {
-    final dateKey = generateDateKey(DateTime.now());
-
-    return ZeronImpactCalculator.buildDailySummary(
-      dateKey: dateKey,
-      totalSteps: steps,
+      totalSteps: totalSteps,
       goalSteps: goalSteps,
-      hasDailyGoalBonus: steps >= goalSteps,
+      totalCo2KgSaved: co2,
+      totalPrimePoints: points,
+      hasDailyGoalBonus: hasDailyGoalBonus,
     );
-  }
-
-  /// ===============================
-  /// ユーザー更新（最重要）
-  /// ===============================
-  static ZeronUser applyTodayUpdate({
-    required ZeronUser user,
-    required int todaySteps,
-  }) {
-    final co2 =
-        ZeronImpactCalculator.calculateCo2KgSavedFromSteps(todaySteps);
-
-    final isGoal = todaySteps >= 8000;
-
-    final points = ZeronImpactCalculator.calculatePrimePoints(
-      steps: todaySteps,
-      co2KgSaved: co2,
-      hasDailyGoalBonus: isGoal,
-    );
-
-    return user.copyWith(
-      todaySteps: todaySteps,
-      todayCo2KgSaved: co2,
-      todayPrimePoints: points,
-      totalSteps: user.totalSteps + todaySteps,
-      totalCo2KgSaved: user.totalCo2KgSaved + co2,
-      totalPrimePoints: user.totalPrimePoints + points,
-      lastActiveAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-  }
-
-  /// ===============================
-  /// 過去データ生成（グラフ用）
-  /// ===============================
-  static List<DailyImpactSummary> generatePastSummaries({
-    required int days,
-    int goalSteps = 8000,
-  }) {
-    final List<DailyImpactSummary> list = [];
-
-    for (int i = days - 1; i >= 0; i--) {
-      final date = DateTime.now().subtract(Duration(days: i));
-      final steps = _random.nextInt(12000);
-
-      final summary = ZeronImpactCalculator.buildDailySummary(
-        dateKey: generateDateKey(date),
-        totalSteps: steps,
-        goalSteps: goalSteps,
-        hasDailyGoalBonus: steps >= goalSteps,
-      );
-
-      list.add(summary);
-    }
-
-    return list;
-  }
-
-  /// ===============================
-  /// 内部：速度推定
-  /// ===============================
-  static double _estimateSpeed(int steps) {
-    if (steps <= 0) return 0;
-
-    final distance =
-        ZeronImpactCalculator.calculateDistanceKmFromSteps(steps);
-
-    final hours = max(0.5, _random.nextDouble() * 2.5);
-
-    return distance / hours;
-  }
-
-  /// ===============================
-  /// 内部：ID生成
-  /// ===============================
-  static String _generateId() {
-    return DateTime.now().millisecondsSinceEpoch.toString() +
-        _random.nextInt(9999).toString();
   }
 }

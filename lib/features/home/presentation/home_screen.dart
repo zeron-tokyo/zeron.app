@@ -28,7 +28,8 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
   Timer? _openingTimer;
 
   bool _showOpening = true;
-  bool _termsChecked = false;
+  bool _isCheckingTerms = false;
+  bool _termsAccepted = false;
 
   @override
   void initState() {
@@ -40,6 +41,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     )..forward();
 
     _openingTimer = Timer(_openingDuration, _finishOpening);
+    _loadTermsState();
   }
 
   @override
@@ -47,6 +49,15 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     _openingTimer?.cancel();
     _openingController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadTermsState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final accepted = prefs.getBool(_termsAcceptedKey) ?? false;
+    if (!mounted) return;
+    setState(() {
+      _termsAccepted = accepted;
+    });
   }
 
   Future<void> _finishOpening() async {
@@ -60,27 +71,34 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
   }
 
   Future<void> _ensureTermsAccepted() async {
-    if (_termsChecked || !mounted) return;
-    _termsChecked = true;
+    if (!mounted || _termsAccepted || _isCheckingTerms) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final accepted = prefs.getBool(_termsAcceptedKey) ?? false;
-
-    if (!mounted || accepted) return;
+    _isCheckingTerms = true;
 
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => _TermsDialog(
-        onAccept: () async {
-          final localPrefs = await SharedPreferences.getInstance();
-          await localPrefs.setBool(_termsAcceptedKey, true);
-          if (context.mounted) {
-            Navigator.of(context).pop();
-          }
-        },
-      ),
+      builder: (context) {
+        return _TermsDialog(
+          onAccept: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool(_termsAcceptedKey, true);
+
+            if (mounted) {
+              setState(() {
+                _termsAccepted = true;
+              });
+            }
+
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
+        );
+      },
     );
+
+    _isCheckingTerms = false;
   }
 
   void _skipOpening() {
@@ -92,6 +110,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 700),
         switchInCurve: Curves.easeOutCubic,
@@ -142,7 +161,7 @@ class _OpeningScene extends StatelessWidget {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onSkip,
-          child: Container(
+          child: ColoredBox(
             color: Colors.black,
             child: Stack(
               fit: StackFit.expand,
@@ -187,9 +206,7 @@ class _OpeningScene extends StatelessWidget {
                     offset: Offset(0, drift),
                     child: Opacity(
                       opacity: logoOpacity,
-                      child: const ZeronLogo(
-                        isIdle: false,
-                      ),
+                      child: const ZeronLogo(isIdle: false),
                     ),
                   ),
                 ),
@@ -310,6 +327,12 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
   late int _baseTotalPrimePoints;
 
   StreamSubscription<int>? _stepSubscription;
+  Timer? _ambientTimer;
+
+  double _presenceSeconds = 0.0;
+  double _interactionEnergy = 0.10;
+  bool _isPointerInside = false;
+  Offset _pointerPosition = const Offset(0, 0);
 
   @override
   void initState() {
@@ -317,12 +340,26 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     StepService.init();
     _initData();
     _bindStepStream();
+    _startAmbientTimer();
   }
 
   @override
   void dispose() {
     _stepSubscription?.cancel();
+    _ambientTimer?.cancel();
     super.dispose();
+  }
+
+  void _startAmbientTimer() {
+    _ambientTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
+      if (!mounted) return;
+      setState(() {
+        _presenceSeconds += 0.08;
+        _interactionEnergy = _isPointerInside
+            ? (_interactionEnergy + 0.010).clamp(0.08, 0.60)
+            : (_interactionEnergy - 0.008).clamp(0.08, 0.22);
+      });
+    });
   }
 
   void _initData() {
@@ -756,38 +793,91 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       _AccountPage(data: data),
     ];
 
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF020406),
-            Color(0xFF040A0E),
-            Color(0xFF010203),
-          ],
-        ),
-      ),
-      child: Column(
-        children: [
-          Expanded(
-            child: SafeArea(
-              bottom: false,
-              child: IndexedStack(
-                index: _currentIndex,
-                children: pages,
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() {
+          _isPointerInside = true;
+        });
+      },
+      onExit: (_) {
+        setState(() {
+          _isPointerInside = false;
+          _pointerPosition = const Offset(0, 0);
+        });
+      },
+      onHover: (event) {
+        setState(() {
+          _pointerPosition = event.localPosition;
+          _interactionEnergy = (_interactionEnergy + 0.02).clamp(0.08, 0.60);
+        });
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            ZeronNoise(
+              presenceSeconds: _presenceSeconds,
+              ambientStage: 2,
+              interactionEnergy: _interactionEnergy,
+              isPointerInside: _isPointerInside,
+            ),
+            ZeronBackground(
+              presenceSeconds: _presenceSeconds,
+              ambientStage: 2,
+              interactionEnergy: _interactionEnergy,
+              pointerPosition: _pointerPosition,
+            ),
+            ZeronDistortion(
+              presenceSeconds: _presenceSeconds,
+              ambientStage: 2,
+              interactionEnergy: _interactionEnergy,
+              pointerPosition: _pointerPosition,
+            ),
+            ZeronGlow(
+              presenceSeconds: _presenceSeconds,
+              ambientStage: 2,
+              interactionEnergy: _interactionEnergy,
+              pointerPosition: _pointerPosition,
+              memoryPresence: 0.10,
+              memoryType: _isPointerInside ? 'active' : 'still',
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    const Color(0xFF020406).withOpacity(0.60),
+                    const Color(0xFF040A0E).withOpacity(0.52),
+                    const Color(0xFF010203).withOpacity(0.78),
+                  ],
+                ),
               ),
             ),
-          ),
-          _BottomBar(
-            index: _currentIndex,
-            onChanged: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-          ),
-        ],
+            Column(
+              children: [
+                Expanded(
+                  child: SafeArea(
+                    bottom: false,
+                    child: IndexedStack(
+                      index: _currentIndex,
+                      children: pages,
+                    ),
+                  ),
+                ),
+                _BottomBar(
+                  index: _currentIndex,
+                  onChanged: (index) {
+                    setState(() {
+                      _currentIndex = index;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1739,9 +1829,7 @@ class _RankTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: _panelDecoration(
-        highlighted: highlighted,
-      ),
+      decoration: _panelDecoration(highlighted: highlighted),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       child: Row(
         children: [
@@ -2074,277 +2162,6 @@ class _HomeDemoState {
   final String monthlyEventDescription;
   final int eventDaysLeft;
   final int sponsorReadyUsers;
-
-  factory _HomeDemoState.build() {
-    final now = DateTime.now();
-
-    final todaySummary = ZeronImpactCalculator.buildDailySummary(
-      dateKey: '2026-03-21',
-      totalSteps: 8420,
-      goalSteps: 10000,
-      hasDailyGoalBonus: false,
-      hasEventBoost: true,
-    );
-
-    final user = ZeronUser(
-      id: 'user_cocoro_demo',
-      email: 'your.email@example.com',
-      countryCode: 'JP',
-      countryName: 'Japan',
-      city: 'Tokyo',
-      plan: ZeronPlan.free,
-      termsAccepted: true,
-      createdAt: now.subtract(const Duration(days: 180)),
-      updatedAt: now,
-      displayName: 'Cocoro S.',
-      primaryTeamId: 'team_company_zeron_tokyo',
-      totalSteps: 1245820,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
-        1245820,
-      ),
-      totalPrimePoints: 58240,
-      todaySteps: todaySummary.totalSteps,
-      todayCo2KgSaved: todaySummary.totalCo2KgSaved,
-      todayPrimePoints: todaySummary.totalPrimePoints,
-      worldRank: 124432,
-      countryRank: 1522,
-      cityRank: 18,
-      teamRank: 4,
-    );
-
-    final friendsTeam = TeamModel(
-      id: 'team_friends',
-      name: 'Friends Team',
-      kind: TeamKind.friends,
-      ownerUserId: user.id,
-      memberCount: 12,
-      totalSteps: 53000,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(53000),
-      totalPrimePoints: 4820,
-      createdAt: now.subtract(const Duration(days: 80)),
-      updatedAt: now,
-      description: 'Close friends walking together for weekly impact.',
-      countryCode: 'JP',
-      city: 'Tokyo',
-    );
-
-    final familyTeam = TeamModel(
-      id: 'team_family',
-      name: 'Family Team',
-      kind: TeamKind.family,
-      ownerUserId: user.id,
-      memberCount: 5,
-      totalSteps: 47500,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(47500),
-      totalPrimePoints: 1940,
-      createdAt: now.subtract(const Duration(days: 120)),
-      updatedAt: now,
-      description: 'Family movement and shared health participation.',
-      countryCode: 'JP',
-      city: 'Tokyo',
-    );
-
-    final companyTeam = TeamModel(
-      id: 'team_company_zeron_tokyo',
-      name: 'Company Team',
-      kind: TeamKind.company,
-      ownerUserId: user.id,
-      memberCount: 48,
-      totalSteps: 38200,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(38200),
-      totalPrimePoints: 16300,
-      createdAt: now.subtract(const Duration(days: 160)),
-      updatedAt: now,
-      description: 'Workplace climate participation unit.',
-      countryCode: 'JP',
-      city: 'Tokyo',
-    );
-
-    final global = GlobalImpactSnapshot(
-      activeUsers: 2340000,
-      activeTeams: 42550,
-      activeCountries: 118,
-      activeCities: 3240,
-      totalStepsToday: 4245332000,
-      totalStepsThisMonth: 91245000000,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
-        4245332000,
-      ),
-      totalPrimePoints: 15842000,
-      rewardPoolYen: 12500000,
-      updatedAt: now,
-    );
-
-    final worldRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'world_1',
-        scope: RankScope.world,
-        rank: 1,
-        name: 'neo.rearri@example.com',
-        value: 124432,
-        label: 'Top global walker',
-      ),
-      RankEntryModel(
-        id: 'world_2',
-        scope: RankScope.world,
-        rank: 2,
-        name: user.displayName ?? 'You',
-        value: user.todaySteps,
-        label: 'ZERON Tokyo',
-        isCurrentUser: true,
-        relatedUserId: user.id,
-      ),
-      const RankEntryModel(
-        id: 'world_3',
-        scope: RankScope.world,
-        rank: 3,
-        name: 'Aster Vale',
-        value: 8118,
-        label: 'United States',
-      ),
-      const RankEntryModel(
-        id: 'world_4',
-        scope: RankScope.world,
-        rank: 4,
-        name: 'Eon Loop',
-        value: 7980,
-        label: 'Germany',
-      ),
-    ];
-
-    final countryRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'country_1',
-        scope: RankScope.country,
-        rank: 1,
-        name: 'Japan',
-        value: 4245332000,
-        label: 'Country steps rank',
-      ),
-      RankEntryModel(
-        id: 'country_2',
-        scope: RankScope.country,
-        rank: 2,
-        name: user.displayName ?? 'You',
-        value: user.todaySteps,
-        label: 'Tokyo',
-        isCurrentUser: true,
-        relatedUserId: user.id,
-      ),
-      const RankEntryModel(
-        id: 'country_3',
-        scope: RankScope.country,
-        rank: 3,
-        name: 'Kyoto Walker',
-        value: 8050,
-        label: 'Kyoto',
-      ),
-      const RankEntryModel(
-        id: 'country_4',
-        scope: RankScope.country,
-        rank: 4,
-        name: 'Sapporo Run',
-        value: 7944,
-        label: 'Sapporo',
-      ),
-    ];
-
-    final cityRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'city_1',
-        scope: RankScope.city,
-        rank: 1,
-        name: 'Tokyo',
-        value: 18,
-        label: 'City position',
-      ),
-      RankEntryModel(
-        id: 'city_2',
-        scope: RankScope.city,
-        rank: 2,
-        name: user.displayName ?? 'You',
-        value: user.todaySteps,
-        label: 'Tokyo rank #18',
-        isCurrentUser: true,
-        relatedUserId: user.id,
-      ),
-      const RankEntryModel(
-        id: 'city_3',
-        scope: RankScope.city,
-        rank: 3,
-        name: 'Minato Walker',
-        value: 8310,
-        label: 'Tokyo',
-      ),
-      const RankEntryModel(
-        id: 'city_4',
-        scope: RankScope.city,
-        rank: 4,
-        name: 'Shibuya Pulse',
-        value: 8088,
-        label: 'Tokyo',
-      ),
-    ];
-
-    final teamRank = <RankEntryModel>[
-      RankEntryModel(
-        id: 'team_1',
-        scope: RankScope.team,
-        rank: 1,
-        name: friendsTeam.name,
-        value: friendsTeam.totalSteps,
-        label: 'Team steps',
-        relatedTeamId: friendsTeam.id,
-      ),
-      RankEntryModel(
-        id: 'team_2',
-        scope: RankScope.team,
-        rank: 2,
-        name: familyTeam.name,
-        value: familyTeam.totalSteps,
-        label: 'Team steps',
-        relatedTeamId: familyTeam.id,
-      ),
-      RankEntryModel(
-        id: 'team_3',
-        scope: RankScope.team,
-        rank: 3,
-        name: companyTeam.name,
-        value: 41500,
-        label: 'Team steps',
-        relatedTeamId: companyTeam.id,
-      ),
-      RankEntryModel(
-        id: 'team_4',
-        scope: RankScope.team,
-        rank: 4,
-        name: 'ZERON Tokyo',
-        value: companyTeam.totalSteps,
-        label: 'Your current team',
-        isCurrentUser: true,
-        relatedTeamId: companyTeam.id,
-      ),
-    ];
-
-    return _HomeDemoState(
-      user: user,
-      todaySummary: todaySummary,
-      global: global,
-      primaryTeam: companyTeam,
-      friendsTeam: friendsTeam,
-      familyTeam: familyTeam,
-      companyTeam: companyTeam,
-      worldRank: worldRank,
-      countryRank: countryRank,
-      cityRank: cityRank,
-      teamRank: teamRank,
-      monthlyEventTitle: 'March Earth Pulse',
-      monthlyEventDescription:
-          'Walk together to unlock sponsor-backed reward tiers and global city rankings.',
-      eventDaysLeft: 11,
-      sponsorReadyUsers: 684000,
-    );
-  }
 }
 
 class _EarthPainter extends CustomPainter {
