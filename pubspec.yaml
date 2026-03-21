@@ -28,7 +28,7 @@ flutter:
     - assets/brand/
     - assets/icon/
 
-flutter_icons:
-  macos:
-    generate: true
-    image_path: "assets/icon/zeron_app_icon.png"
+flutter_launcher_icons:
+  ios: true
+  image_path: "assets/icon/zeron_app_logo.png"
+  remove_alpha_ios: true
