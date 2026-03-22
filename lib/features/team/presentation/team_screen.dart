@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:zeron/core/models/app_models.dart';
 
 class TeamScreen extends StatelessWidget {
   const TeamScreen({super.key});
@@ -11,64 +12,175 @@ class TeamScreen extends StatelessWidget {
   static const Color _textPrimary = Colors.white;
   static const Color _textSecondary = Color(0xB3FFFFFF);
 
+  String _formatNumber(int value) {
+    final source = value.abs().toString();
+    final buffer = StringBuffer();
+    for (int i = 0; i < source.length; i++) {
+      final position = source.length - i;
+      buffer.write(source[i]);
+      if (position > 1 && position % 3 == 1) {
+        buffer.write(',');
+      }
+    }
+    final result = buffer.toString();
+    return value < 0 ? '-$result' : result;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final teams = <TeamModel>[
+      TeamModel(
+        id: 'team_friends',
+        name: 'Friends Team',
+        kind: TeamKind.friends,
+        ownerUserId: 'user_cocoro_demo',
+        memberCount: 12,
+        totalSteps: 53000,
+        totalCo2KgSaved: 34.8,
+        totalPrimePoints: 4820,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        description:
+            'Turn casual walks into a shared challenge and keep motivation high with weekly movement goals.',
+        countryCode: 'JP',
+        city: 'Tokyo',
+      ),
+      TeamModel(
+        id: 'team_family',
+        name: 'Family Team',
+        kind: TeamKind.family,
+        ownerUserId: 'user_cocoro_demo',
+        memberCount: 5,
+        totalSteps: 47500,
+        totalCo2KgSaved: 12.6,
+        totalPrimePoints: 1940,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        description:
+            'Make daily health routines visible across your family and grow climate participation together.',
+        countryCode: 'JP',
+        city: 'Tokyo',
+      ),
+      TeamModel(
+        id: 'team_company',
+        name: 'Company Team',
+        kind: TeamKind.company,
+        ownerUserId: 'user_cocoro_demo',
+        memberCount: 48,
+        totalSteps: 382000,
+        totalCo2KgSaved: 128.4,
+        totalPrimePoints: 16300,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        description:
+            'Scale workplace engagement and show how organizational movement can contribute to global impact.',
+        countryCode: 'JP',
+        city: 'Tokyo',
+      ),
+    ];
+
+    final totalMembers = teams.fold<int>(0, (sum, team) => sum + team.memberCount);
+    final activeTeams = teams.length;
+
+    final topStepsTeam = [...teams]..sort((a, b) => b.totalSteps.compareTo(a.totalSteps));
+    final topImpactTeam = [...teams]
+      ..sort((a, b) => b.totalCo2KgSaved.compareTo(a.totalCo2KgSaved));
+    final consistencyTeam = [...teams]
+      ..sort((a, b) => a.memberCount.compareTo(b.memberCount));
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-      children: const [
-        SizedBox(height: 6),
-        _PageHeader(
+      children: [
+        const SizedBox(height: 6),
+        const _PageHeader(
           title: 'Team',
           subtitle:
               'Build shared momentum with friends, family, and companies through collective walking impact.',
         ),
-        SizedBox(height: 18),
-        _TeamHeroCard(),
-        SizedBox(height: 16),
-        _TeamCard(
-          title: 'Friends Team',
-          subtitle:
-              'Turn casual walks into a shared challenge and keep motivation high with weekly movement goals.',
-          icon: Icons.diversity_3_rounded,
-          members: '12 members',
-          co2Saved: '34.8 kg CO₂',
-          points: '4,820 Prime Points',
-          steps: '53,000 steps',
-          accent: Color(0xFF79F7D4),
-          badge: 'Most Active',
+        const SizedBox(height: 18),
+        _TeamHeroCard(
+          activeTeams: '$activeTeams',
+          combinedMembers: _formatNumber(totalMembers),
         ),
-        SizedBox(height: 16),
-        _TeamCard(
-          title: 'Family Team',
-          subtitle:
-              'Make daily health routines visible across your family and grow climate participation together.',
-          icon: Icons.favorite_rounded,
-          members: '5 members',
-          co2Saved: '12.6 kg CO₂',
-          points: '1,940 Prime Points',
-          steps: '47,500 steps',
-          accent: Color(0xFF8CD8FF),
-          badge: 'Weekly Goal On Track',
+        const SizedBox(height: 16),
+        ...List.generate(
+          teams.length,
+          (index) {
+            final team = teams[index];
+            return Padding(
+              padding: EdgeInsets.only(bottom: index == teams.length - 1 ? 0 : 16),
+              child: _TeamCard(
+                title: team.name,
+                subtitle: team.description ?? '',
+                icon: _kindIcon(team.kind),
+                members: '${_formatNumber(team.memberCount)} members',
+                co2Saved: '${team.totalCo2KgSaved.toStringAsFixed(1)} kg CO₂',
+                points: '${_formatNumber(team.totalPrimePoints)} Prime Points',
+                steps: '${_formatNumber(team.totalSteps)} steps',
+                accent: _kindAccent(team.kind),
+                badge: _kindBadge(team.kind),
+                kindLabel: _kindLabel(team.kind),
+                isPrimary: team.kind == TeamKind.company,
+              ),
+            );
+          },
         ),
-        SizedBox(height: 16),
-        _TeamCard(
-          title: 'Company Team',
-          subtitle:
-              'Scale workplace engagement and show how organizational movement can contribute to global impact.',
-          icon: Icons.apartment_rounded,
-          members: '48 members',
-          co2Saved: '128.4 kg CO₂',
-          points: '16,300 Prime Points',
-          steps: '382,000 steps',
-          accent: Color(0xFFFFC978),
-          badge: 'Top Ranked',
+        const SizedBox(height: 16),
+        _TeamInsightCard(
+          mostActiveGroup: topStepsTeam.first.name,
+          highestImpactUnit: topImpactTeam.first.name,
+          bestConsistencySignal: consistencyTeam.first.name,
         ),
-        SizedBox(height: 16),
-        _TeamInsightCard(),
-        SizedBox(height: 16),
-        _ComingSoonCard(),
+        const SizedBox(height: 16),
+        const _CreateTeamCard(),
+        const SizedBox(height: 16),
+        const _ComingSoonCard(),
       ],
     );
+  }
+
+  static IconData _kindIcon(TeamKind kind) {
+    switch (kind) {
+      case TeamKind.friends:
+        return Icons.diversity_3_rounded;
+      case TeamKind.family:
+        return Icons.favorite_rounded;
+      case TeamKind.company:
+        return Icons.apartment_rounded;
+    }
+  }
+
+  static Color _kindAccent(TeamKind kind) {
+    switch (kind) {
+      case TeamKind.friends:
+        return const Color(0xFF79F7D4);
+      case TeamKind.family:
+        return const Color(0xFF8CD8FF);
+      case TeamKind.company:
+        return const Color(0xFFFFC978);
+    }
+  }
+
+  static String _kindLabel(TeamKind kind) {
+    switch (kind) {
+      case TeamKind.friends:
+        return 'Friends';
+      case TeamKind.family:
+        return 'Family';
+      case TeamKind.company:
+        return 'Company';
+    }
+  }
+
+  static String _kindBadge(TeamKind kind) {
+    switch (kind) {
+      case TeamKind.friends:
+        return 'Most Active';
+      case TeamKind.family:
+        return 'Weekly Goal On Track';
+      case TeamKind.company:
+        return 'Primary Team';
+    }
   }
 }
 
@@ -111,7 +223,13 @@ class _PageHeader extends StatelessWidget {
 }
 
 class _TeamHeroCard extends StatelessWidget {
-  const _TeamHeroCard();
+  const _TeamHeroCard({
+    required this.activeTeams,
+    required this.combinedMembers,
+  });
+
+  final String activeTeams;
+  final String combinedMembers;
 
   @override
   Widget build(BuildContext context) {
@@ -161,18 +279,18 @@ class _TeamHeroCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 Row(
-                  children: const [
+                  children: [
                     Expanded(
                       child: _HeroMetric(
                         label: 'Active Teams',
-                        value: '3',
+                        value: activeTeams,
                       ),
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: _HeroMetric(
                         label: 'Combined Members',
-                        value: '65',
+                        value: combinedMembers,
                       ),
                     ),
                   ],
@@ -243,6 +361,8 @@ class _TeamCard extends StatelessWidget {
     required this.steps,
     required this.accent,
     required this.badge,
+    required this.kindLabel,
+    required this.isPrimary,
   });
 
   final String title;
@@ -254,11 +374,13 @@ class _TeamCard extends StatelessWidget {
   final String steps;
   final Color accent;
   final String badge;
+  final String kindLabel;
+  final bool isPrimary;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: _panelDecoration(),
+      decoration: _panelDecoration(highlighted: isPrimary),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,27 +417,54 @@ class _TeamCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: accent.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: accent.withOpacity(0.22),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: accent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: accent.withOpacity(0.22),
+                            ),
+                          ),
+                          child: Text(
+                            badge,
+                            style: TextStyle(
+                              color: accent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        badge,
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.08),
+                            ),
+                          ),
+                          child: Text(
+                            kindLabel,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.72),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -338,7 +487,6 @@ class _TeamCard extends StatelessWidget {
                 child: _StatPill(
                   label: 'Members',
                   value: members,
-                  accent: accent,
                 ),
               ),
               const SizedBox(width: 10),
@@ -346,7 +494,6 @@ class _TeamCard extends StatelessWidget {
                 child: _StatPill(
                   label: 'Saved',
                   value: co2Saved,
-                  accent: accent,
                 ),
               ),
             ],
@@ -358,7 +505,6 @@ class _TeamCard extends StatelessWidget {
                 child: _StatPill(
                   label: 'Points',
                   value: points,
-                  accent: accent,
                 ),
               ),
               const SizedBox(width: 10),
@@ -366,7 +512,6 @@ class _TeamCard extends StatelessWidget {
                 child: _StatPill(
                   label: 'Steps',
                   value: steps,
-                  accent: accent,
                 ),
               ),
             ],
@@ -381,12 +526,10 @@ class _StatPill extends StatelessWidget {
   const _StatPill({
     required this.label,
     required this.value,
-    required this.accent,
   });
 
   final String label;
   final String value;
-  final Color accent;
 
   @override
   Widget build(BuildContext context) {
@@ -426,7 +569,15 @@ class _StatPill extends StatelessWidget {
 }
 
 class _TeamInsightCard extends StatelessWidget {
-  const _TeamInsightCard();
+  const _TeamInsightCard({
+    required this.mostActiveGroup,
+    required this.highestImpactUnit,
+    required this.bestConsistencySignal,
+  });
+
+  final String mostActiveGroup;
+  final String highestImpactUnit;
+  final String bestConsistencySignal;
 
   @override
   Widget build(BuildContext context) {
@@ -445,19 +596,19 @@ class _TeamInsightCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          const _SignalRow(
+          _SignalRow(
             label: 'Most active group',
-            value: 'Friends Team',
+            value: mostActiveGroup,
           ),
           const SizedBox(height: 10),
-          const _SignalRow(
+          _SignalRow(
             label: 'Highest impact unit',
-            value: 'Company Team',
+            value: highestImpactUnit,
           ),
           const SizedBox(height: 10),
-          const _SignalRow(
+          _SignalRow(
             label: 'Best consistency signal',
-            value: 'Family Team',
+            value: bestConsistencySignal,
           ),
         ],
       ),
@@ -496,6 +647,67 @@ class _SignalRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CreateTeamCard extends StatelessWidget {
+  const _CreateTeamCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: _panelDecoration(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: TeamScreen._mintStrong.withOpacity(0.12),
+              border: Border.all(
+                color: TeamScreen._mintStrong.withOpacity(0.22),
+              ),
+            ),
+            child: const Icon(
+              Icons.add_rounded,
+              color: TeamScreen._mintStrong,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Create Team',
+                  style: TextStyle(
+                    color: TeamScreen._textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Create a new team for friends, family, or company and prepare the structure for future invite and mission systems.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.70),
+                    fontSize: 13,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white.withOpacity(0.60),
+          ),
+        ],
+      ),
     );
   }
 }
