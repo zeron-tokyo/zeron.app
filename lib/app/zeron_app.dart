@@ -8,10 +8,11 @@ class ZeronApp extends StatelessWidget {
   Widget build(BuildContext context) {
     const Color baseBlack = Color(0xFF020406);
     const Color panel = Color(0xFF0A1115);
+    const Color panelStrong = Color(0xFF0E181A);
     const Color softWhite = Color(0xFFF3FBF7);
     const Color mint = Color(0xFFB8FFE3);
 
-    final ThemeData theme = ThemeData(
+    final theme = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: baseBlack,
@@ -39,6 +40,14 @@ class ZeronApp extends StatelessWidget {
         onSecondary: baseBlack,
         onSurface: softWhite,
       ),
+      scaffoldMessengerTheme: const ScaffoldMessengerThemeData(
+        backgroundColor: panelStrong,
+        contentTextStyle: TextStyle(
+          color: softWhite,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
       textSelectionTheme: const TextSelectionThemeData(
         cursorColor: softWhite,
         selectionColor: Color(0x33FFFFFF),
@@ -51,6 +60,23 @@ class ZeronApp extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         foregroundColor: softWhite,
         centerTitle: true,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) return mint;
+          return Colors.white.withOpacity(0.90);
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return mint.withOpacity(0.35);
+          }
+          return Colors.white.withOpacity(0.16);
+        }),
+      ),
+      dividerTheme: DividerThemeData(
+        color: Colors.white.withOpacity(0.08),
+        thickness: 1,
+        space: 1,
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
@@ -67,8 +93,8 @@ class ZeronApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'ZERON',
       themeMode: ThemeMode.dark,
-      darkTheme: theme,
       theme: theme,
+      darkTheme: theme,
       home: const ZeronHomeScreen(),
     );
   }
