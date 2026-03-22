@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zeron/core/models/app_models.dart';
 import 'package:zeron/core/services/step_service.dart';
-import 'package:zeron/features/team/presentation/team_screen.dart';
 import 'package:zeron/widgets/zeron_background.dart';
 import 'package:zeron/widgets/zeron_distortion.dart';
 import 'package:zeron/widgets/zeron_glow.dart';
@@ -231,6 +230,20 @@ class _OpeningScene extends StatelessWidget {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 18),
+                        Opacity(
+                          opacity: titleOpacity,
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: const [
+                              _OpeningChip(label: 'Version 1.0.0'),
+                              _OpeningChip(label: 'Settings inside Account'),
+                              _OpeningChip(label: 'Account ready'),
+                            ],
+                          ),
+                        ),
                         const Spacer(),
                         Opacity(
                           opacity: footerOpacity,
@@ -271,7 +284,7 @@ class _OpeningScene extends StatelessWidget {
                                   ),
                                 ),
                                 child: Text(
-                                  'Tap to skip',
+                                  'Tap to enter',
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.70),
                                     fontSize: 11,
@@ -296,6 +309,33 @@ class _OpeningScene extends StatelessWidget {
   }
 }
 
+class _OpeningChip extends StatelessWidget {
+  const _OpeningChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.76),
+          fontSize: 10.5,
+          letterSpacing: 0.8,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
 class _ZeronMainShell extends StatefulWidget {
   const _ZeronMainShell({super.key});
 
@@ -304,7 +344,14 @@ class _ZeronMainShell extends StatefulWidget {
 }
 
 class _ZeronMainShellState extends State<_ZeronMainShell> {
+  static const String _languageKey = 'zeron_language_v1';
+  static const String _soundKey = 'zeron_sound_v1';
+  static const String _notificationsKey = 'zeron_notifications_v1';
+
   int _currentIndex = 0;
+  String _language = 'en';
+  bool _soundOn = true;
+  bool _notificationsOn = true;
 
   late ZeronUser _user;
   late DailyImpactSummary _todaySummary;
@@ -339,6 +386,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     super.initState();
     StepService.init();
     _initData();
+    _loadSettings();
     _bindStepStream();
     _startAmbientTimer();
   }
@@ -349,6 +397,46 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     _ambientTimer?.cancel();
     super.dispose();
   }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    setState(() {
+      _language = prefs.getString(_languageKey) ?? 'en';
+      _soundOn = prefs.getBool(_soundKey) ?? true;
+      _notificationsOn = prefs.getBool(_notificationsKey) ?? true;
+    });
+  }
+
+  Future<void> _setLanguage(String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_languageKey, value);
+    if (!mounted) return;
+    setState(() {
+      _language = value;
+    });
+  }
+
+  Future<void> _setSound(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_soundKey, value);
+    if (!mounted) return;
+    setState(() {
+      _soundOn = value;
+    });
+  }
+
+  Future<void> _setNotifications(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notificationsKey, value);
+    if (!mounted) return;
+    setState(() {
+      _notificationsOn = value;
+    });
+  }
+
+  String _t(String en, String ja) => _language == 'ja' ? ja : en;
 
   void _startAmbientTimer() {
     _ambientTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
@@ -404,7 +492,9 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       ownerUserId: _user.id,
       memberCount: 12,
       totalSteps: 53000,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(53000),
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
+        53000,
+      ),
       totalPrimePoints: 4820,
       createdAt: now.subtract(const Duration(days: 80)),
       updatedAt: now,
@@ -420,7 +510,9 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       ownerUserId: _user.id,
       memberCount: 5,
       totalSteps: 47500,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(47500),
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
+        47500,
+      ),
       totalPrimePoints: 1940,
       createdAt: now.subtract(const Duration(days: 120)),
       updatedAt: now,
@@ -436,7 +528,9 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       ownerUserId: _user.id,
       memberCount: 48,
       totalSteps: 38200,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(38200),
+      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
+        38200,
+      ),
       totalPrimePoints: 16300,
       createdAt: now.subtract(const Duration(days: 160)),
       updatedAt: now,
@@ -759,6 +853,46 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         label: 'Tokyo',
       ),
     ];
+
+    _teamRank = <RankEntryModel>[
+      RankEntryModel(
+        id: 'team_1',
+        scope: RankScope.team,
+        rank: 1,
+        name: _friendsTeam.name,
+        value: _friendsTeam.totalSteps,
+        label: 'Team steps',
+        relatedTeamId: _friendsTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_2',
+        scope: RankScope.team,
+        rank: 2,
+        name: _familyTeam.name,
+        value: _familyTeam.totalSteps,
+        label: 'Team steps',
+        relatedTeamId: _familyTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_3',
+        scope: RankScope.team,
+        rank: 3,
+        name: _companyTeam.name,
+        value: 41500,
+        label: 'Team steps',
+        relatedTeamId: _companyTeam.id,
+      ),
+      RankEntryModel(
+        id: 'team_4',
+        scope: RankScope.team,
+        rank: 4,
+        name: 'ZERON Tokyo',
+        value: _companyTeam.totalSteps,
+        label: 'Your current team',
+        isCurrentUser: true,
+        relatedTeamId: _companyTeam.id,
+      ),
+    ];
   }
 
   _HomeDemoState _viewState() {
@@ -786,11 +920,20 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     final data = _viewState();
 
     final pages = <Widget>[
-      _TodayPage(data: data),
-      _DashboardPage(data: data),
-      _RankPage(data: data),
-      const TeamScreen(),
-      _AccountPage(data: data),
+      _TodayPage(data: data, t: _t),
+      _DashboardPage(data: data, t: _t),
+      _RankPage(data: data, t: _t),
+      _TeamPage(data: data, t: _t),
+      _AccountPage(
+        data: data,
+        t: _t,
+        language: _language,
+        soundOn: _soundOn,
+        notificationsOn: _notificationsOn,
+        onSetLanguage: _setLanguage,
+        onSetSound: _setSound,
+        onSetNotifications: _setNotifications,
+      ),
     ];
 
     return MouseRegion(
@@ -868,6 +1011,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
                 ),
                 _BottomBar(
                   index: _currentIndex,
+                  labelBuilder: _navLabel,
                   onChanged: (index) {
                     setState(() {
                       _currentIndex = index;
@@ -881,12 +1025,33 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       ),
     );
   }
+
+  String _navLabel(int index) {
+    switch (index) {
+      case 0:
+        return _t('Today', '今日');
+      case 1:
+        return _t('Dashboard', 'ダッシュボード');
+      case 2:
+        return _t('Rank', 'ランク');
+      case 3:
+        return _t('Team', 'チーム');
+      case 4:
+        return _t('Account', 'アカウント');
+      default:
+        return '';
+    }
+  }
 }
 
 class _TodayPage extends StatelessWidget {
-  const _TodayPage({required this.data});
+  const _TodayPage({
+    required this.data,
+    required this.t,
+  });
 
   final _HomeDemoState data;
+  final String Function(String en, String ja) t;
 
   @override
   Widget build(BuildContext context) {
@@ -894,16 +1059,23 @@ class _TodayPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
         const SizedBox(height: 6),
-        const _PageHeader(
-          title: 'Earth Today',
-          subtitle: 'Every step joins the global decarbonization field.',
+        _PageHeader(
+          title: t('Today', '今日'),
+          subtitle: t(
+            'Every step joins the global decarbonization field.',
+            '一歩ごとの行動が、世界の脱炭素フィールドに接続されます。',
+          ),
         ),
         const SizedBox(height: 18),
         _GlobeHero(
-          title: '${_formatNumber(data.global.totalStepsToday)} steps',
-          subtitle: 'Global steps today',
-          centerLabel: '${_formatNumber(data.user.todaySteps)}',
-          bottomLabel: 'You helped Earth today',
+          title: '${_formatNumber(data.global.totalStepsToday)} ${t('steps', '歩')}',
+          subtitle: t('Global Steps Today', '今日の世界歩数'),
+          centerLabel: _formatNumber(data.user.todaySteps),
+          centerSuffix: t('steps', '歩'),
+          bottomLabel: t(
+            'You helped Earth today',
+            'あなたは今日、地球に貢献しました',
+          ),
           progress: data.todaySummary.goalProgress,
         ),
         const SizedBox(height: 18),
@@ -911,7 +1083,7 @@ class _TodayPage extends StatelessWidget {
           children: [
             Expanded(
               child: _MetricCard(
-                title: 'CO₂ Saved',
+                title: t('CO₂ Saved', 'CO₂削減量'),
                 value:
                     '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
                 icon: Icons.eco_outlined,
@@ -920,7 +1092,7 @@ class _TodayPage extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                title: 'Prime Points',
+                title: t('Prime Points', 'プライムポイント'),
                 value: _formatNumber(data.todaySummary.totalPrimePoints),
                 icon: Icons.bolt_outlined,
               ),
@@ -929,23 +1101,26 @@ class _TodayPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _MetricCard(
-          title: 'Monthly Event',
+          title: t('Monthly Event', '月間イベント'),
           value: data.monthlyEventTitle,
           icon: Icons.emoji_events_outlined,
           subtitle:
-              '${data.monthlyEventDescription}\nEnds in ${data.eventDaysLeft} days',
+              '${data.monthlyEventDescription}\n${t('Ends in', '終了まで')} ${data.eventDaysLeft} ${t('days', '日')}',
         ),
         const SizedBox(height: 12),
         _ProgressCard(
-          title: 'Daily Goal',
+          title: t('Daily Goal', 'デイリー目標'),
           current: data.todaySummary.totalSteps,
           goal: data.todaySummary.goalSteps,
+          stepLabel: t('steps', '歩'),
         ),
         const SizedBox(height: 12),
-        const _ActionCard(
-          title: 'Why your steps matter',
-          body:
-              'ZERON converts walking into verified participation data for future sponsor rewards, monthly events, and carbon-credit linked initiatives.',
+        _ActionCard(
+          title: t('Why your steps matter', '歩く意味'),
+          body: t(
+            'ZERON converts walking into verified participation data for future sponsor rewards, monthly events, and carbon-credit linked initiatives.',
+            'ZERONは歩行を検証可能な参加データへ変換し、将来のスポンサー報酬、月間イベント、カーボンクレジット連動施策へ接続します。',
+          ),
         ),
       ],
     );
@@ -953,9 +1128,13 @@ class _TodayPage extends StatelessWidget {
 }
 
 class _DashboardPage extends StatelessWidget {
-  const _DashboardPage({required this.data});
+  const _DashboardPage({
+    required this.data,
+    required this.t,
+  });
 
   final _HomeDemoState data;
+  final String Function(String en, String ja) t;
 
   @override
   Widget build(BuildContext context) {
@@ -963,18 +1142,21 @@ class _DashboardPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
         const SizedBox(height: 6),
-        const _PageHeader(
-          title: 'Earth Dashboard',
-          subtitle: 'Live view of users, steps, CO₂ reduction and momentum.',
+        _PageHeader(
+          title: t('Dashboard', 'ダッシュボード'),
+          subtitle: t(
+            'Live view of users, steps, CO₂ reduction and momentum.',
+            '世界の参加状況、歩数、CO₂削減、成長モメンタムの可視化。',
+          ),
         ),
         const SizedBox(height: 18),
-        _DashboardHero(data: data),
+        _DashboardHero(data: data, t: t),
         const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
               child: _MetricCard(
-                title: 'Active Walkers',
+                title: t('Active Walkers', 'アクティブユーザー'),
                 value: _formatNumber(data.global.activeUsers),
                 icon: Icons.groups_2_outlined,
               ),
@@ -982,7 +1164,7 @@ class _DashboardPage extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                title: 'Countries',
+                title: t('Countries', '参加国数'),
                 value: _formatNumber(data.global.activeCountries),
                 icon: Icons.public_outlined,
               ),
@@ -994,7 +1176,7 @@ class _DashboardPage extends StatelessWidget {
           children: [
             Expanded(
               child: _MetricCard(
-                title: 'This Month Steps',
+                title: t('Monthly Steps', '月間歩数'),
                 value: _formatNumber(data.global.totalStepsThisMonth),
                 icon: Icons.bar_chart_outlined,
               ),
@@ -1002,7 +1184,7 @@ class _DashboardPage extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                title: 'CO₂ Saved',
+                title: t('CO₂ Saved Total', '総CO₂削減'),
                 value: '${_formatNumberDouble(data.global.totalCo2KgSaved)} kg',
                 icon: Icons.forest_outlined,
               ),
@@ -1011,21 +1193,21 @@ class _DashboardPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _SectionCard(
-          title: 'Growth Signals',
+          title: t('Growth Signals', '成長指標'),
           child: Column(
             children: [
               _SignalRow(
-                label: 'Monthly active teams',
+                label: t('Active Teams', 'アクティブチーム'),
                 value: _formatNumber(data.global.activeTeams),
               ),
               const SizedBox(height: 10),
               _SignalRow(
-                label: 'Sponsor-ready participation pool',
-                value: '${_formatNumber(data.sponsorReadyUsers)} users',
+                label: t('Participation Pool', '参加母数'),
+                value: '${_formatNumber(data.sponsorReadyUsers)} ${t('users', '人')}',
               ),
               const SizedBox(height: 10),
               _SignalRow(
-                label: 'Reward reserve projection',
+                label: t('Reward Reserve', '報酬準備量'),
                 value: '¥${_formatNumber(data.global.rewardPoolYen)}',
               ),
             ],
@@ -1037,9 +1219,13 @@ class _DashboardPage extends StatelessWidget {
 }
 
 class _RankPage extends StatefulWidget {
-  const _RankPage({required this.data});
+  const _RankPage({
+    required this.data,
+    required this.t,
+  });
 
   final _HomeDemoState data;
+  final String Function(String en, String ja) t;
 
   @override
   State<_RankPage> createState() => _RankPageState();
@@ -1050,7 +1236,13 @@ class _RankPageState extends State<_RankPage> {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['World', 'Country', 'City', 'Team'];
+    final labels = [
+      widget.t('World', '世界'),
+      widget.t('Country', '国'),
+      widget.t('City', '都市'),
+      widget.t('Team', 'チーム'),
+    ];
+
     final lists = [
       widget.data.worldRank,
       widget.data.countryRank,
@@ -1067,20 +1259,29 @@ class _RankPageState extends State<_RankPage> {
                 : widget.data.user.teamRank ?? 0;
 
     final userCaption = _segment == 0
-        ? 'World ranking'
+        ? widget.t('World ranking', '世界ランキング')
         : _segment == 1
-            ? '${widget.data.user.countryName} ranking'
+            ? widget.t(
+                '${widget.data.user.countryName} ranking',
+                '${widget.data.user.countryName}内ランキング',
+              )
             : _segment == 2
-                ? '${widget.data.user.city} ranking'
-                : 'Team ranking';
+                ? widget.t(
+                    '${widget.data.user.city} ranking',
+                    '${widget.data.user.city}内ランキング',
+                  )
+                : widget.t('Team ranking', 'チームランキング');
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
         const SizedBox(height: 6),
-        const _PageHeader(
-          title: 'Rank',
-          subtitle: 'Compete globally, nationally, locally and by team.',
+        _PageHeader(
+          title: widget.t('Rank', 'ランク'),
+          subtitle: widget.t(
+            'Compete globally, nationally, locally and by team.',
+            '世界・国内・都市・チームで競争し、現在地を可視化します。',
+          ),
         ),
         const SizedBox(height: 18),
         _SegmentBar(
@@ -1094,7 +1295,7 @@ class _RankPageState extends State<_RankPage> {
         ),
         const SizedBox(height: 16),
         _SummaryRankCard(
-          title: 'Your Position',
+          title: widget.t('Your Ranking', '自分の順位'),
           value: '#$userPosition',
           caption: userCaption,
         ),
@@ -1122,10 +1323,102 @@ class _RankPageState extends State<_RankPage> {
   }
 }
 
-class _AccountPage extends StatelessWidget {
-  const _AccountPage({required this.data});
+class _TeamPage extends StatelessWidget {
+  const _TeamPage({
+    required this.data,
+    required this.t,
+  });
 
   final _HomeDemoState data;
+  final String Function(String en, String ja) t;
+
+  @override
+  Widget build(BuildContext context) {
+    final teams = [
+      data.primaryTeam,
+      data.friendsTeam,
+      data.familyTeam,
+      data.companyTeam,
+    ];
+
+    final totalMembers = teams.fold<int>(
+      0,
+      (sum, team) => sum + team.memberCount,
+    );
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+      children: [
+        const SizedBox(height: 6),
+        _PageHeader(
+          title: t('Team', 'チーム'),
+          subtitle: t(
+            'Belong, build, compete and co-create impact.',
+            '所属、共創、競争、協力をひとつの参加体験に統合します。',
+          ),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                title: t('Active Teams', 'チーム数'),
+                value: _formatNumber(data.global.activeTeams),
+                icon: Icons.groups_outlined,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MetricCard(
+                title: t('Members', 'メンバー数'),
+                value: _formatNumber(totalMembers),
+                icon: Icons.person_outline_rounded,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...List.generate(
+          teams.length,
+          (index) {
+            final team = teams[index];
+            return Padding(
+              padding: EdgeInsets.only(bottom: index == teams.length - 1 ? 0 : 12),
+              child: _TeamCard(
+                team: team,
+                isPrimary: team.id == data.primaryTeam.id,
+                t: t,
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        _CreateTeamCard(t: t),
+      ],
+    );
+  }
+}
+
+class _AccountPage extends StatelessWidget {
+  const _AccountPage({
+    required this.data,
+    required this.t,
+    required this.language,
+    required this.soundOn,
+    required this.notificationsOn,
+    required this.onSetLanguage,
+    required this.onSetSound,
+    required this.onSetNotifications,
+  });
+
+  final _HomeDemoState data;
+  final String Function(String en, String ja) t;
+  final String language;
+  final bool soundOn;
+  final bool notificationsOn;
+  final Future<void> Function(String value) onSetLanguage;
+  final Future<void> Function(bool value) onSetSound;
+  final Future<void> Function(bool value) onSetNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -1133,33 +1426,48 @@ class _AccountPage extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
         const SizedBox(height: 6),
-        const _PageHeader(
-          title: 'Account',
-          subtitle: 'Identity, permissions, legal status and membership.',
+        _PageHeader(
+          title: t('Account', 'アカウント'),
+          subtitle: t(
+            'Identity, permissions, legal status and membership.',
+            'プロフィール、法務、設定、サブスクリプション管理。',
+          ),
         ),
         const SizedBox(height: 18),
         _SectionCard(
-          title: 'Profile',
+          title: t('Profile', 'プロフィール'),
           child: Column(
             children: [
               _AccountRow(label: 'Email', value: data.user.email),
               const SizedBox(height: 14),
-              _AccountRow(label: 'Country', value: data.user.countryName),
+              _AccountRow(
+                label: t('Country', '国'),
+                value: data.user.countryName,
+              ),
               const SizedBox(height: 14),
-              _AccountRow(label: 'City', value: data.user.city),
+              _AccountRow(
+                label: t('City', '都市'),
+                value: data.user.city,
+              ),
               const SizedBox(height: 14),
-              _AccountRow(label: 'Plan', value: _planLabel(data.user.plan)),
+              _AccountRow(
+                label: t('Plan', 'プラン'),
+                value: _planLabel(data.user.plan),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         _SectionCard(
-          title: 'ZERON+',
+          title: t('Subscription', 'サブスクリプション'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Unlock advanced ranking analytics, event boosts, sponsor campaign priority and future reward acceleration.',
+                t(
+                  'Unlock advanced ranking analytics, event boosts, sponsor campaign priority and future reward acceleration.',
+                  '高度なランキング分析、イベントブースト、スポンサーキャンペーン優先参加、将来の報酬加速を解放します。',
+                ),
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.74),
                   fontSize: 13,
@@ -1186,10 +1494,13 @@ class _AccountPage extends StatelessWidget {
                       color: Color(0xFFB8FFE3),
                     ),
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Subscription ready for sponsor and reward expansion',
-                        style: TextStyle(
+                        t(
+                          'Subscription ready for sponsor and reward expansion',
+                          'スポンサー連動と報酬拡張に対応するサブスク準備済み',
+                        ),
+                        style: const TextStyle(
                           color: Color(0xFFEFFFF8),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -1212,16 +1523,50 @@ class _AccountPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _SectionCard(
-          title: 'Legal',
+          title: t('Legal', '法務'),
           child: Column(
-            children: const [
-              _SimpleArrowRow(label: 'Terms of Service'),
-              SizedBox(height: 14),
-              _SimpleArrowRow(label: 'Privacy Policy'),
-              SizedBox(height: 14),
-              _SimpleArrowRow(label: 'Anti-Cheat & Fair Use'),
-              SizedBox(height: 14),
-              _SimpleArrowRow(label: 'Sponsor Reward Policy'),
+            children: [
+              _SimpleArrowRow(label: t('Terms of Service', '利用規約')),
+              const SizedBox(height: 14),
+              _SimpleArrowRow(label: t('Privacy Policy', 'プライバシーポリシー')),
+              const SizedBox(height: 14),
+              _SimpleArrowRow(label: t('Anti-Cheat Policy', '不正防止ポリシー')),
+              const SizedBox(height: 14),
+              _SimpleArrowRow(label: t('Commercial Law', '特定商取引法表記')),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _SectionCard(
+          title: t('Settings', '設定'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t('Language', '言語'),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.70),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _LanguageSelector(
+                selected: language,
+                onChanged: onSetLanguage,
+              ),
+              const SizedBox(height: 18),
+              _ToggleRow(
+                label: t('Sound', '音'),
+                value: soundOn,
+                onChanged: onSetSound,
+              ),
+              const SizedBox(height: 12),
+              _ToggleRow(
+                label: t('Notifications', '通知'),
+                value: notificationsOn,
+                onChanged: onSetNotifications,
+              ),
             ],
           ),
         ),
@@ -1273,6 +1618,7 @@ class _GlobeHero extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.centerLabel,
+    required this.centerSuffix,
     required this.bottomLabel,
     required this.progress,
   });
@@ -1280,6 +1626,7 @@ class _GlobeHero extends StatelessWidget {
   final String title;
   final String subtitle;
   final String centerLabel;
+  final String centerSuffix;
   final String bottomLabel;
   final double progress;
 
@@ -1327,7 +1674,7 @@ class _GlobeHero extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'steps',
+                      centerSuffix,
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.82),
                         fontSize: 15,
@@ -1354,9 +1701,13 @@ class _GlobeHero extends StatelessWidget {
 }
 
 class _DashboardHero extends StatelessWidget {
-  const _DashboardHero({required this.data});
+  const _DashboardHero({
+    required this.data,
+    required this.t,
+  });
 
   final _HomeDemoState data;
+  final String Function(String en, String ja) t;
 
   @override
   Widget build(BuildContext context) {
@@ -1366,9 +1717,9 @@ class _DashboardHero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Global Field',
-            style: TextStyle(
+          Text(
+            t('Global Field', 'グローバルフィールド'),
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -1376,7 +1727,7 @@ class _DashboardHero extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${_formatNumber(data.global.totalStepsToday)} steps',
+            '${_formatNumber(data.global.totalStepsToday)} ${t('steps', '歩')}',
             style: const TextStyle(
               color: Color(0xFFEAFBF2),
               fontSize: 32,
@@ -1386,17 +1737,17 @@ class _DashboardHero extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _MetricLine(
-            label: 'Today CO₂ saved',
+            label: t('CO₂ Saved Today', '今日のCO₂削減'),
             value: '${_formatNumberDouble(data.global.totalCo2KgSaved)} kg',
           ),
           const SizedBox(height: 10),
           _MetricLine(
-            label: 'Reward points minted',
+            label: t('Reward Points Minted', '生成ポイント'),
             value: _formatNumber(data.global.totalPrimePoints),
           ),
           const SizedBox(height: 10),
           _MetricLine(
-            label: 'Cities active',
+            label: t('Active Cities', 'アクティブ都市数'),
             value: _formatNumber(data.global.activeCities),
           ),
         ],
@@ -1468,11 +1819,13 @@ class _ProgressCard extends StatelessWidget {
     required this.title,
     required this.current,
     required this.goal,
+    required this.stepLabel,
   });
 
   final String title;
   final int current;
   final int goal;
+  final String stepLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -1504,7 +1857,7 @@ class _ProgressCard extends StatelessWidget {
                 ),
               ),
               Text(
-                ' / ${_formatNumber(goal)} steps',
+                ' / ${_formatNumber(goal)} $stepLabel',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.62),
                   fontSize: 13,
@@ -1892,6 +2245,234 @@ class _RankTile extends StatelessWidget {
   }
 }
 
+class _TeamCard extends StatelessWidget {
+  const _TeamCard({
+    required this.team,
+    required this.isPrimary,
+    required this.t,
+  });
+
+  final TeamModel team;
+  final bool isPrimary;
+  final String Function(String en, String ja) t;
+
+  String _kindLabel() {
+    switch (team.kind) {
+      case TeamKind.friends:
+        return t('Friends', 'フレンズ');
+      case TeamKind.family:
+        return t('Family', 'ファミリー');
+      case TeamKind.company:
+        return t('Company', 'カンパニー');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: _panelDecoration(highlighted: isPrimary),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFB8FFE3).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: const Color(0xFFB8FFE3).withOpacity(0.18),
+                  ),
+                ),
+                child: Text(
+                  _kindLabel(),
+                  style: const TextStyle(
+                    color: Color(0xFFEFFFF8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                isPrimary ? t('Primary', 'メイン') : t('Active', '稼働中'),
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.62),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            team.name,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            team.description ?? '',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.68),
+              fontSize: 12.5,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _TinyMetric(
+                  label: t('Members', '人数'),
+                  value: _formatNumber(team.memberCount),
+                ),
+              ),
+              Expanded(
+                child: _TinyMetric(
+                  label: t('CO₂ Saved', 'CO₂削減'),
+                  value: '${team.totalCo2KgSaved.toStringAsFixed(1)} kg',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _TinyMetric(
+                  label: t('Points', 'ポイント'),
+                  value: _formatNumber(team.totalPrimePoints),
+                ),
+              ),
+              Expanded(
+                child: _TinyMetric(
+                  label: t('Steps', '歩数'),
+                  value: _formatNumber(team.totalSteps),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CreateTeamCard extends StatelessWidget {
+  const _CreateTeamCard({
+    required this.t,
+  });
+
+  final String Function(String en, String ja) t;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: _panelDecoration(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFB8FFE3).withOpacity(0.10),
+            ),
+            child: const Icon(
+              Icons.add_rounded,
+              color: Color(0xFFB8FFE3),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t('Create Team', 'チームを作成'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  t(
+                    'Build a new participation unit for friends, family or company.',
+                    'フレンド、ファミリー、会社単位で新しい参加ユニットを作成します。',
+                  ),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.64),
+                    fontSize: 12.5,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white.withOpacity(0.60),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TinyMetric extends StatelessWidget {
+  const _TinyMetric({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      margin: const EdgeInsets.only(right: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.58),
+              fontSize: 11.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AccountRow extends StatelessWidget {
   const _AccountRow({
     required this.label,
@@ -1961,23 +2542,143 @@ class _SimpleArrowRow extends StatelessWidget {
   }
 }
 
+class _LanguageSelector extends StatelessWidget {
+  const _LanguageSelector({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final String selected;
+  final Future<void> Function(String value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _LanguageButton(
+            label: 'English',
+            selected: selected == 'en',
+            onTap: () => onChanged('en'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _LanguageButton(
+            label: '日本語',
+            selected: selected == 'ja',
+            onTap: () => onChanged('ja'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LanguageButton extends StatelessWidget {
+  const _LanguageButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        await onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFB8FFE3).withOpacity(0.12)
+              : Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFB8FFE3).withOpacity(0.22)
+                : Colors.white.withOpacity(0.06),
+          ),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: selected
+                ? const Color(0xFFEFFFF8)
+                : Colors.white.withOpacity(0.65),
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ToggleRow extends StatelessWidget {
+  const _ToggleRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final Future<void> Function(bool value) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Switch.adaptive(
+          value: value,
+          activeColor: const Color(0xFFB8FFE3),
+          onChanged: (next) async {
+            await onChanged(next);
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.index,
+    required this.labelBuilder,
     required this.onChanged,
   });
 
   final int index;
+  final String Function(int index) labelBuilder;
   final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final items = <_BottomBarItem>[
-      const _BottomBarItem('Today', Icons.home_filled),
-      const _BottomBarItem('Dashboard', Icons.public),
-      const _BottomBarItem('Rank', Icons.bar_chart_rounded),
-      const _BottomBarItem('Team', Icons.groups),
-      const _BottomBarItem('Account', Icons.person_rounded),
+      const _BottomBarItem(Icons.home_filled),
+      const _BottomBarItem(Icons.public),
+      const _BottomBarItem(Icons.bar_chart_rounded),
+      const _BottomBarItem(Icons.groups),
+      const _BottomBarItem(Icons.person_rounded),
     ];
 
     return SafeArea(
@@ -2028,7 +2729,7 @@ class _BottomBar extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          items[i].label,
+                          labelBuilder(i),
                           style: TextStyle(
                             color: selected
                                 ? const Color(0xFFEFFFF8)
@@ -2122,9 +2823,8 @@ class _TermsDialog extends StatelessWidget {
 }
 
 class _BottomBarItem {
-  const _BottomBarItem(this.label, this.icon);
+  const _BottomBarItem(this.icon);
 
-  final String label;
   final IconData icon;
 }
 
@@ -2195,21 +2895,106 @@ class _EarthPainter extends CustomPainter {
 
     canvas.drawCircle(center, radius * 1.05, glow);
 
+    final earthRect = Rect.fromCircle(center: center, radius: radius);
+
     final earth = Paint()
       ..shader = RadialGradient(
         center: const Alignment(-0.18, -0.22),
         radius: 0.96,
         colors: [
-          const Color(0xFF76FFD8).withOpacity(0.85),
-          const Color(0xFF1A3E46).withOpacity(0.92),
-          const Color(0xFF091319),
+          const Color(0xFF5BE1D4).withOpacity(0.92),
+          const Color(0xFF12415A).withOpacity(0.96),
+          const Color(0xFF051017),
         ],
-        stops: const [0.0, 0.35, 1.0],
-      ).createShader(
-        Rect.fromCircle(center: center, radius: radius),
-      );
+        stops: const [0.0, 0.38, 1.0],
+      ).createShader(earthRect);
 
     canvas.drawCircle(center, radius, earth);
+
+    final continent = Paint()
+      ..color = const Color(0xFF9EF6D6).withOpacity(0.24)
+      ..style = PaintingStyle.fill;
+
+    final continent2 = Paint()
+      ..color = const Color(0xFFC8FFE6).withOpacity(0.18)
+      ..style = PaintingStyle.fill;
+
+    final asia = Path()
+      ..moveTo(center.dx - radius * 0.05, center.dy - radius * 0.28)
+      ..quadraticBezierTo(
+        center.dx + radius * 0.18,
+        center.dy - radius * 0.36,
+        center.dx + radius * 0.24,
+        center.dy - radius * 0.16,
+      )
+      ..quadraticBezierTo(
+        center.dx + radius * 0.32,
+        center.dy - radius * 0.02,
+        center.dx + radius * 0.12,
+        center.dy + radius * 0.12,
+      )
+      ..quadraticBezierTo(
+        center.dx - radius * 0.06,
+        center.dy + radius * 0.02,
+        center.dx - radius * 0.05,
+        center.dy - radius * 0.28,
+      );
+
+    final australia = Path()
+      ..moveTo(center.dx + radius * 0.18, center.dy + radius * 0.24)
+      ..quadraticBezierTo(
+        center.dx + radius * 0.30,
+        center.dy + radius * 0.20,
+        center.dx + radius * 0.28,
+        center.dy + radius * 0.34,
+      )
+      ..quadraticBezierTo(
+        center.dx + radius * 0.18,
+        center.dy + radius * 0.38,
+        center.dx + radius * 0.14,
+        center.dy + radius * 0.28,
+      )
+      ..close();
+
+    final eurasia = Path()
+      ..moveTo(center.dx - radius * 0.32, center.dy - radius * 0.08)
+      ..quadraticBezierTo(
+        center.dx - radius * 0.18,
+        center.dy - radius * 0.24,
+        center.dx - radius * 0.02,
+        center.dy - radius * 0.16,
+      )
+      ..quadraticBezierTo(
+        center.dx - radius * 0.18,
+        center.dy - radius * 0.02,
+        center.dx - radius * 0.30,
+        center.dy + radius * 0.04,
+      )
+      ..quadraticBezierTo(
+        center.dx - radius * 0.36,
+        center.dy - radius * 0.02,
+        center.dx - radius * 0.32,
+        center.dy - radius * 0.08,
+      );
+
+    canvas.save();
+    canvas.clipPath(Path()..addOval(earthRect));
+    canvas.drawPath(asia, continent);
+    canvas.drawPath(australia, continent2);
+    canvas.drawPath(eurasia, continent2);
+
+    final cloud = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
+      ..color = Colors.white.withOpacity(0.05);
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius * 0.92),
+      -0.8,
+      1.6,
+      false,
+      cloud..style = PaintingStyle.stroke..strokeWidth = radius * 0.08,
+    );
+    canvas.restore();
 
     final ringPaint = Paint()
       ..style = PaintingStyle.stroke
