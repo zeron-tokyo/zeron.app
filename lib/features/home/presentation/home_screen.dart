@@ -380,7 +380,7 @@ class _OpeningScene extends StatelessWidget {
                                     vertical: 8,
                                   ),
                                   child: Text(
-                                    'Setting',
+                                    'Setting / 設定',
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.92),
                                       fontSize: 18,
@@ -502,7 +502,7 @@ class _RegistrationDialogState extends State<_RegistrationDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Create your account',
+                'Create your account / アカウント作成',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 22,
@@ -917,6 +917,25 @@ User Rights
 Users may request correction or deletion of stored personal information subject to applicable law and operational requirements.
 ''';
 
+const String _antiCheatText = '''
+ZERON uses participation integrity rules to protect rankings, sponsor-linked rewards, and environmental credibility.
+
+Prohibited Conduct
+- Artificial step inflation using spoofing, automation, emulator-based motion, or unauthorized devices
+- Multiple account abuse for ranking manipulation
+- Tampering with app behavior, APIs, local storage, or measurement logic
+- Any fraudulent participation designed to distort rankings, campaigns, or rewards
+
+Enforcement
+ZERON may investigate suspicious activity and take action including score invalidation, account restriction, suspension, or permanent removal.
+
+Data Review
+Participation records, device metadata, behavioral patterns, and anomaly signals may be reviewed to protect fairness.
+
+Appeals
+Users may contact support for a review if they believe an enforcement action was applied incorrectly.
+''';
+
 class _ZeronMainShell extends StatefulWidget {
   const _ZeronMainShell({super.key});
 
@@ -928,6 +947,18 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
   static const String _languageKey = 'zeron_language_v1';
   static const String _soundKey = 'zeron_sound_v1';
   static const String _notificationsKey = 'zeron_notifications_v1';
+
+  static const String _profileNameKey = 'zeron_username_v1';
+  static const String _profileEmailKey = 'zeron_email_v1';
+  static const String _profileCountryKey = 'zeron_country_v1';
+  static const String _profileRegionKey = 'zeron_region_v1';
+
+  static const String _persistTotalStepsKey = 'zeron_total_steps_v2';
+  static const String _persistTotalCo2Key = 'zeron_total_co2_v2';
+  static const String _persistTotalPointsKey = 'zeron_total_points_v2';
+  static const String _persistLastDateKey = 'zeron_last_date_v2';
+  static const String _persistTeamsKey = 'zeron_teams_v2';
+  static const String _persistPrimaryTeamIdKey = 'zeron_primary_team_id_v2';
 
   int _currentIndex = 0;
   String _language = 'en';
@@ -950,9 +981,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
   late int _eventDaysLeft;
   late int _sponsorReadyUsers;
 
-  late int _baseTotalSteps;
-  late double _baseTotalCo2KgSaved;
-  late int _baseTotalPrimePoints;
+  final List<TeamModel> _teams = <TeamModel>[];
 
   StreamSubscription<int>? _stepSubscription;
   Timer? _ambientTimer;
@@ -965,10 +994,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
   @override
   void initState() {
     super.initState();
-    StepService.init();
-    _initData();
-    _loadSettings();
-    _bindStepStream();
+    _bootstrap();
     _startAmbientTimer();
   }
 
@@ -977,6 +1003,13 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     _stepSubscription?.cancel();
     _ambientTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _bootstrap() async {
+    await StepService.init();
+    await _loadSettings();
+    await _loadRuntimeState();
+    _bindStepStream();
   }
 
   Future<void> _loadSettings() async {
@@ -1031,449 +1064,437 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     });
   }
 
-  void _initData() {
+  Future<void> _loadRuntimeState() async {
+    final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
+    final todayKey = _dateKey(now);
 
-    _baseTotalSteps = 1245820;
-    _baseTotalCo2KgSaved = ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
-      _baseTotalSteps,
-    );
-    _baseTotalPrimePoints = 58240;
+    final displayName = prefs.getString(_profileNameKey);
+    final email = prefs.getString(_profileEmailKey) ?? '';
+    final country = prefs.getString(_profileCountryKey) ?? 'Japan';
+    final region = prefs.getString(_profileRegionKey) ?? 'Tokyo';
 
-    _todaySummary = StepService.buildSummary(0);
+    final persistedDate = prefs.getString(_persistLastDateKey);
+    final persistedTotalSteps = prefs.getInt(_persistTotalStepsKey) ?? 0;
+    final persistedTotalCo2 = prefs.getDouble(_persistTotalCo2Key) ?? 0.0;
+    final persistedTotalPoints = prefs.getInt(_persistTotalPointsKey) ?? 0;
+
+    final liveTodaySteps = StepService.currentSteps;
+    final liveSummary = StepService.buildSummary(liveTodaySteps);
+
+    final totalSteps = persistedDate == todayKey
+        ? (persistedTotalSteps - liveTodaySteps).clamp(0, 1 << 30) + liveTodaySteps
+        : persistedTotalSteps;
+
+    final totalCo2 = persistedDate == todayKey
+        ? (persistedTotalCo2 - liveSummary.totalCo2KgSaved).clamp(0.0, double.infinity) +
+            liveSummary.totalCo2KgSaved
+        : persistedTotalCo2;
+
+    final totalPoints = persistedDate == todayKey
+        ? (persistedTotalPoints - liveSummary.totalPrimePoints).clamp(0, 1 << 30) +
+            liveSummary.totalPrimePoints
+        : persistedTotalPoints;
+
+    _todaySummary = liveSummary;
 
     _user = ZeronUser(
-      id: 'user_cocoro_demo',
-      email: 'your.email@example.com',
+      id: 'zeron_local_user',
+      email: email,
       countryCode: 'JP',
-      countryName: 'Japan',
-      city: 'Tokyo',
+      countryName: country.isEmpty ? 'Japan' : country,
+      city: region.isEmpty ? 'Tokyo' : region,
       plan: ZeronPlan.free,
       termsAccepted: true,
-      createdAt: now.subtract(const Duration(days: 180)),
+      createdAt: now,
       updatedAt: now,
-      displayName: 'Cocoro S.',
-      primaryTeamId: 'team_company_zeron_tokyo',
-      totalSteps: _baseTotalSteps,
-      totalCo2KgSaved: _baseTotalCo2KgSaved,
-      totalPrimePoints: _baseTotalPrimePoints,
-      todaySteps: 0,
-      todayCo2KgSaved: 0,
-      todayPrimePoints: 0,
-      worldRank: 124432,
-      countryRank: 1522,
-      cityRank: 18,
-      teamRank: 4,
+      lastActiveAt: now,
+      displayName: (displayName == null || displayName.trim().isEmpty)
+          ? 'ZERON User'
+          : displayName.trim(),
+      primaryTeamId: null,
+      totalSteps: totalSteps,
+      totalCo2KgSaved: totalCo2,
+      totalPrimePoints: totalPoints,
+      todaySteps: liveSummary.totalSteps,
+      todayCo2KgSaved: liveSummary.totalCo2KgSaved,
+      todayPrimePoints: liveSummary.totalPrimePoints,
+      worldRank: 1,
+      countryRank: 1,
+      cityRank: 1,
+      teamRank: 1,
     );
 
-    _friendsTeam = TeamModel(
-      id: 'team_friends',
-      name: 'Friends Team',
-      kind: TeamKind.friends,
-      ownerUserId: _user.id,
-      memberCount: 12,
-      totalSteps: 53000,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
-        53000,
-      ),
-      totalPrimePoints: 4820,
-      createdAt: now.subtract(const Duration(days: 80)),
-      updatedAt: now,
-      description: 'Close friends walking together for weekly impact.',
-      countryCode: 'JP',
-      city: 'Tokyo',
+    _teams
+      ..clear()
+      ..addAll(_loadTeamsFromPrefs(prefs, now));
+
+    if (_teams.isEmpty) {
+      _teams.add(
+        TeamModel(
+          id: 'team_${now.microsecondsSinceEpoch}',
+          name: 'My Team',
+          kind: TeamKind.company,
+          ownerUserId: _user.id,
+          memberCount: 1,
+          totalSteps: _user.totalSteps,
+          totalCo2KgSaved: _user.totalCo2KgSaved,
+          totalPrimePoints: _user.totalPrimePoints,
+          createdAt: now,
+          updatedAt: now,
+          description: 'Your primary local impact team.',
+          countryCode: _user.countryCode,
+          city: _user.city,
+        ),
+      );
+      await _saveTeams();
+    }
+
+    final storedPrimaryId = prefs.getString(_persistPrimaryTeamIdKey);
+    _primaryTeam = _teams.firstWhere(
+      (team) => team.id == storedPrimaryId,
+      orElse: () => _teams.first,
     );
 
-    _familyTeam = TeamModel(
-      id: 'team_family',
-      name: 'Family Team',
-      kind: TeamKind.family,
-      ownerUserId: _user.id,
-      memberCount: 5,
-      totalSteps: 47500,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
-        47500,
-      ),
-      totalPrimePoints: 1940,
-      createdAt: now.subtract(const Duration(days: 120)),
-      updatedAt: now,
-      description: 'Family movement and shared health participation.',
-      countryCode: 'JP',
-      city: 'Tokyo',
-    );
+    _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
+    _familyTeam = _firstTeamOfKind(TeamKind.family) ?? _primaryTeam;
+    _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
 
-    _companyTeam = TeamModel(
-      id: 'team_company_zeron_tokyo',
-      name: 'Company Team',
-      kind: TeamKind.company,
-      ownerUserId: _user.id,
-      memberCount: 48,
-      totalSteps: 38200,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
-        38200,
-      ),
-      totalPrimePoints: 16300,
-      createdAt: now.subtract(const Duration(days: 160)),
-      updatedAt: now,
-      description: 'Workplace climate participation unit.',
-      countryCode: 'JP',
-      city: 'Tokyo',
-    );
-
-    _primaryTeam = _companyTeam;
-
-    _global = GlobalImpactSnapshot(
-      activeUsers: 2340000,
-      activeTeams: 42550,
-      activeCountries: 118,
-      activeCities: 3240,
-      totalStepsToday: 4245332000,
-      totalStepsThisMonth: 91245000000,
-      totalCo2KgSaved: ZeronImpactCalculator.calculateCo2KgSavedFromSteps(
-        4245332000,
-      ),
-      totalPrimePoints: 15842000,
-      rewardPoolYen: 12500000,
-      updatedAt: now,
-    );
-
-    _worldRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'world_1',
-        scope: RankScope.world,
-        rank: 1,
-        name: 'neo.rearri@example.com',
-        value: 124432,
-        label: 'Top global walker',
-      ),
-      RankEntryModel(
-        id: 'world_2',
-        scope: RankScope.world,
-        rank: 2,
-        name: _user.displayName ?? 'You',
-        value: _user.todaySteps,
-        label: 'ZERON Tokyo',
-        isCurrentUser: true,
-        relatedUserId: _user.id,
-      ),
-      const RankEntryModel(
-        id: 'world_3',
-        scope: RankScope.world,
-        rank: 3,
-        name: 'Aster Vale',
-        value: 8118,
-        label: 'United States',
-      ),
-      const RankEntryModel(
-        id: 'world_4',
-        scope: RankScope.world,
-        rank: 4,
-        name: 'Eon Loop',
-        value: 7980,
-        label: 'Germany',
-      ),
-    ];
-
-    _countryRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'country_1',
-        scope: RankScope.country,
-        rank: 1,
-        name: 'Japan',
-        value: 4245332000,
-        label: 'Country steps rank',
-      ),
-      RankEntryModel(
-        id: 'country_2',
-        scope: RankScope.country,
-        rank: 2,
-        name: _user.displayName ?? 'You',
-        value: _user.todaySteps,
-        label: 'Tokyo',
-        isCurrentUser: true,
-        relatedUserId: _user.id,
-      ),
-      const RankEntryModel(
-        id: 'country_3',
-        scope: RankScope.country,
-        rank: 3,
-        name: 'Kyoto Walker',
-        value: 8050,
-        label: 'Kyoto',
-      ),
-      const RankEntryModel(
-        id: 'country_4',
-        scope: RankScope.country,
-        rank: 4,
-        name: 'Sapporo Run',
-        value: 7944,
-        label: 'Sapporo',
-      ),
-    ];
-
-    _cityRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'city_1',
-        scope: RankScope.city,
-        rank: 1,
-        name: 'Tokyo',
-        value: 18,
-        label: 'City position',
-      ),
-      RankEntryModel(
-        id: 'city_2',
-        scope: RankScope.city,
-        rank: 2,
-        name: _user.displayName ?? 'You',
-        value: _user.todaySteps,
-        label: 'Tokyo rank #18',
-        isCurrentUser: true,
-        relatedUserId: _user.id,
-      ),
-      const RankEntryModel(
-        id: 'city_3',
-        scope: RankScope.city,
-        rank: 3,
-        name: 'Minato Walker',
-        value: 8310,
-        label: 'Tokyo',
-      ),
-      const RankEntryModel(
-        id: 'city_4',
-        scope: RankScope.city,
-        rank: 4,
-        name: 'Shibuya Pulse',
-        value: 8088,
-        label: 'Tokyo',
-      ),
-    ];
-
-    _teamRank = <RankEntryModel>[
-      RankEntryModel(
-        id: 'team_1',
-        scope: RankScope.team,
-        rank: 1,
-        name: _friendsTeam.name,
-        value: _friendsTeam.totalSteps,
-        label: 'Team steps',
-        relatedTeamId: _friendsTeam.id,
-      ),
-      RankEntryModel(
-        id: 'team_2',
-        scope: RankScope.team,
-        rank: 2,
-        name: _familyTeam.name,
-        value: _familyTeam.totalSteps,
-        label: 'Team steps',
-        relatedTeamId: _familyTeam.id,
-      ),
-      RankEntryModel(
-        id: 'team_3',
-        scope: RankScope.team,
-        rank: 3,
-        name: _companyTeam.name,
-        value: 41500,
-        label: 'Team steps',
-        relatedTeamId: _companyTeam.id,
-      ),
-      RankEntryModel(
-        id: 'team_4',
-        scope: RankScope.team,
-        rank: 4,
-        name: 'ZERON Tokyo',
-        value: _companyTeam.totalSteps,
-        label: 'Your current team',
-        isCurrentUser: true,
-        relatedTeamId: _companyTeam.id,
-      ),
-    ];
-
-    _monthlyEventTitle = 'March Earth Pulse';
+    _monthlyEventTitle = 'Daily Earth Impact';
     _monthlyEventDescription =
-        'Walk together to unlock sponsor-backed reward tiers and global city rankings.';
-    _eventDaysLeft = 11;
-    _sponsorReadyUsers = 684000;
+        'Your live step data is measured on-device and converted to visible impact in real time.';
+    _eventDaysLeft = 0;
+    _sponsorReadyUsers = 1;
+
+    _rebuildComputedState();
+  }
+
+  TeamModel? _firstTeamOfKind(TeamKind kind) {
+    for (final team in _teams) {
+      if (team.kind == kind) return team;
+    }
+    return null;
+  }
+
+  List<TeamModel> _loadTeamsFromPrefs(SharedPreferences prefs, DateTime now) {
+    final raw = prefs.getStringList(_persistTeamsKey) ?? <String>[];
+    return raw
+        .map((item) {
+          final parts = item.split('|||');
+          if (parts.length < 9) return null;
+
+          final kind = switch (parts[2]) {
+            'friends' => TeamKind.friends,
+            'family' => TeamKind.family,
+            _ => TeamKind.company,
+          };
+
+          return TeamModel(
+            id: parts[0],
+            name: parts[1],
+            kind: kind,
+            ownerUserId: _user.id,
+            memberCount: int.tryParse(parts[3]) ?? 1,
+            totalSteps: int.tryParse(parts[4]) ?? 0,
+            totalCo2KgSaved: double.tryParse(parts[5]) ?? 0.0,
+            totalPrimePoints: int.tryParse(parts[6]) ?? 0,
+            createdAt: DateTime.tryParse(parts[7]) ?? now,
+            updatedAt: DateTime.tryParse(parts[8]) ?? now,
+            description: parts.length > 9 ? parts[9] : null,
+            countryCode: _user.countryCode,
+            city: _user.city,
+          );
+        })
+        .whereType<TeamModel>()
+        .toList();
+  }
+
+  Future<void> _saveTeams() async {
+    final prefs = await SharedPreferences.getInstance();
+    final payload = _teams
+        .map(
+          (team) => [
+            team.id,
+            team.name,
+            switch (team.kind) {
+              TeamKind.friends => 'friends',
+              TeamKind.family => 'family',
+              TeamKind.company => 'company',
+            },
+            '${team.memberCount}',
+            '${team.totalSteps}',
+            '${team.totalCo2KgSaved}',
+            '${team.totalPrimePoints}',
+            team.createdAt.toIso8601String(),
+            team.updatedAt.toIso8601String(),
+            team.description ?? '',
+          ].join('|||'),
+        )
+        .toList();
+
+    await prefs.setStringList(_persistTeamsKey, payload);
+    await prefs.setString(_persistPrimaryTeamIdKey, _primaryTeam.id);
   }
 
   void _bindStepStream() {
-    _stepSubscription = StepService.stepStream.listen((steps) {
+    _stepSubscription?.cancel();
+    _stepSubscription = StepService.stepStream.listen((steps) async {
       if (!mounted) return;
 
       final summary = StepService.buildSummary(steps);
-      final updatedUser = _buildUserFromSummary(summary);
+      final todayKey = _dateKey(DateTime.now());
 
-      setState(() {
-        _todaySummary = summary;
-        _user = updatedUser;
-        _refreshRanks();
-      });
+      final previousTodaySteps = _user.todaySteps;
+      final previousTodayCo2 = _user.todayCo2KgSaved;
+      final previousTodayPoints = _user.todayPrimePoints;
+
+      final totalSteps =
+          (_user.totalSteps - previousTodaySteps).clamp(0, 1 << 30) + summary.totalSteps;
+      final totalCo2 =
+          (_user.totalCo2KgSaved - previousTodayCo2).clamp(0.0, double.infinity) +
+              summary.totalCo2KgSaved;
+      final totalPoints =
+          (_user.totalPrimePoints - previousTodayPoints).clamp(0, 1 << 30) +
+              summary.totalPrimePoints;
+
+      final updatedUser = _user.copyWith(
+        todaySteps: summary.totalSteps,
+        todayCo2KgSaved: summary.totalCo2KgSaved,
+        todayPrimePoints: summary.totalPrimePoints,
+        totalSteps: totalSteps,
+        totalCo2KgSaved: totalCo2,
+        totalPrimePoints: totalPoints,
+        updatedAt: DateTime.now(),
+        lastActiveAt: DateTime.now(),
+        worldRank: 1,
+        countryRank: 1,
+        cityRank: 1,
+        teamRank: 1,
+      );
+
+      _user = updatedUser;
+      _todaySummary = summary;
+      _syncTeamsWithUser();
+      _rebuildComputedState();
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_persistTotalStepsKey, updatedUser.totalSteps);
+      await prefs.setDouble(_persistTotalCo2Key, updatedUser.totalCo2KgSaved);
+      await prefs.setInt(_persistTotalPointsKey, updatedUser.totalPrimePoints);
+      await prefs.setString(_persistLastDateKey, todayKey);
+      await _saveTeams();
+
+      if (!mounted) return;
+      setState(() {});
     });
   }
 
-  ZeronUser _buildUserFromSummary(DailyImpactSummary summary) {
-    return _user.copyWith(
-      todaySteps: summary.totalSteps,
-      todayCo2KgSaved: summary.totalCo2KgSaved,
-      todayPrimePoints: summary.totalPrimePoints,
-      totalSteps: _baseTotalSteps + summary.totalSteps,
-      totalCo2KgSaved: _baseTotalCo2KgSaved + summary.totalCo2KgSaved,
-      totalPrimePoints: _baseTotalPrimePoints + summary.totalPrimePoints,
-      updatedAt: DateTime.now(),
-      lastActiveAt: DateTime.now(),
-    );
+  void _syncTeamsWithUser() {
+    for (int i = 0; i < _teams.length; i++) {
+      final team = _teams[i];
+      if (team.id == _primaryTeam.id) {
+        _teams[i] = TeamModel(
+          id: team.id,
+          name: team.name,
+          kind: team.kind,
+          ownerUserId: team.ownerUserId,
+          memberCount: team.memberCount,
+          totalSteps: _user.totalSteps,
+          totalCo2KgSaved: _user.totalCo2KgSaved,
+          totalPrimePoints: _user.totalPrimePoints,
+          createdAt: team.createdAt,
+          updatedAt: DateTime.now(),
+          description: team.description,
+          countryCode: team.countryCode,
+          city: team.city,
+        );
+        _primaryTeam = _teams[i];
+        break;
+      }
+    }
+
+    _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
+    _familyTeam = _firstTeamOfKind(TeamKind.family) ?? _primaryTeam;
+    _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
   }
 
-  void _refreshRanks() {
+  void _rebuildComputedState() {
+    final activeTeams = _teams.length;
+    final totalTeamSteps = _teams.fold<int>(0, (sum, team) => sum + team.totalSteps);
+    final totalTeamPoints =
+        _teams.fold<int>(0, (sum, team) => sum + team.totalPrimePoints);
+    final totalTeamCo2 =
+        _teams.fold<double>(0.0, (sum, team) => sum + team.totalCo2KgSaved);
+    final totalMembers = _teams.fold<int>(0, (sum, team) => sum + team.memberCount);
+
+    _global = GlobalImpactSnapshot(
+      activeUsers: 1,
+      activeTeams: activeTeams,
+      activeCountries: 1,
+      activeCities: 1,
+      totalStepsToday: _user.todaySteps,
+      totalStepsThisMonth: _user.totalSteps,
+      totalCo2KgSaved: _user.totalCo2KgSaved,
+      totalPrimePoints: _user.totalPrimePoints,
+      rewardPoolYen: _user.totalPrimePoints,
+      updatedAt: DateTime.now(),
+    );
+
     _worldRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'world_1',
+      RankEntryModel(
+        id: 'world_you',
         scope: RankScope.world,
         rank: 1,
-        name: 'neo.rearri@example.com',
-        value: 124432,
-        label: 'Top global walker',
-      ),
-      RankEntryModel(
-        id: 'world_2',
-        scope: RankScope.world,
-        rank: 2,
         name: _user.displayName ?? 'You',
         value: _user.todaySteps,
-        label: 'ZERON Tokyo',
+        label: 'Live device steps',
         isCurrentUser: true,
         relatedUserId: _user.id,
-      ),
-      const RankEntryModel(
-        id: 'world_3',
-        scope: RankScope.world,
-        rank: 3,
-        name: 'Aster Vale',
-        value: 8118,
-        label: 'United States',
-      ),
-      const RankEntryModel(
-        id: 'world_4',
-        scope: RankScope.world,
-        rank: 4,
-        name: 'Eon Loop',
-        value: 7980,
-        label: 'Germany',
       ),
     ];
 
     _countryRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'country_1',
+      RankEntryModel(
+        id: 'country_you',
         scope: RankScope.country,
         rank: 1,
-        name: 'Japan',
-        value: 4245332000,
-        label: 'Country steps rank',
-      ),
-      RankEntryModel(
-        id: 'country_2',
-        scope: RankScope.country,
-        rank: 2,
         name: _user.displayName ?? 'You',
         value: _user.todaySteps,
-        label: 'Tokyo',
+        label: _user.countryName,
         isCurrentUser: true,
         relatedUserId: _user.id,
-      ),
-      const RankEntryModel(
-        id: 'country_3',
-        scope: RankScope.country,
-        rank: 3,
-        name: 'Kyoto Walker',
-        value: 8050,
-        label: 'Kyoto',
-      ),
-      const RankEntryModel(
-        id: 'country_4',
-        scope: RankScope.country,
-        rank: 4,
-        name: 'Sapporo Run',
-        value: 7944,
-        label: 'Sapporo',
       ),
     ];
 
     _cityRank = <RankEntryModel>[
-      const RankEntryModel(
-        id: 'city_1',
+      RankEntryModel(
+        id: 'city_you',
         scope: RankScope.city,
         rank: 1,
-        name: 'Tokyo',
-        value: 18,
-        label: 'City position',
-      ),
-      RankEntryModel(
-        id: 'city_2',
-        scope: RankScope.city,
-        rank: 2,
         name: _user.displayName ?? 'You',
         value: _user.todaySteps,
-        label: 'Tokyo rank #18',
+        label: _user.city,
         isCurrentUser: true,
         relatedUserId: _user.id,
       ),
-      const RankEntryModel(
-        id: 'city_3',
-        scope: RankScope.city,
-        rank: 3,
-        name: 'Minato Walker',
-        value: 8310,
-        label: 'Tokyo',
-      ),
-      const RankEntryModel(
-        id: 'city_4',
-        scope: RankScope.city,
-        rank: 4,
-        name: 'Shibuya Pulse',
-        value: 8088,
-        label: 'Tokyo',
-      ),
     ];
 
-    _teamRank = <RankEntryModel>[
-      RankEntryModel(
-        id: 'team_1',
-        scope: RankScope.team,
-        rank: 1,
-        name: _friendsTeam.name,
-        value: _friendsTeam.totalSteps,
-        label: 'Team steps',
-        relatedTeamId: _friendsTeam.id,
+    final sortedTeams = [..._teams]..sort((a, b) => b.totalSteps.compareTo(a.totalSteps));
+    _teamRank = List<RankEntryModel>.generate(
+      sortedTeams.length,
+      (index) {
+        final team = sortedTeams[index];
+        return RankEntryModel(
+          id: 'team_${team.id}',
+          scope: RankScope.team,
+          rank: index + 1,
+          name: team.name,
+          value: team.totalSteps,
+          label: team.id == _primaryTeam.id ? 'Primary live team' : 'Local team',
+          isCurrentUser: team.id == _primaryTeam.id,
+          relatedTeamId: team.id,
+        );
+      },
+    );
+
+    _sponsorReadyUsers = 1;
+    _monthlyEventTitle = activeTeams > 1 ? 'Team Impact Live' : 'Solo Impact Live';
+    _monthlyEventDescription =
+        'Device steps, saved teams, points, and CO₂ are running from local live data.';
+    _eventDaysLeft = 0;
+
+    _global = GlobalImpactSnapshot(
+      activeUsers: 1,
+      activeTeams: activeTeams,
+      activeCountries: 1,
+      activeCities: 1,
+      totalStepsToday: _user.todaySteps,
+      totalStepsThisMonth: totalTeamSteps == 0 ? _user.totalSteps : totalTeamSteps,
+      totalCo2KgSaved: totalTeamCo2 == 0 ? _user.totalCo2KgSaved : totalTeamCo2,
+      totalPrimePoints: totalTeamPoints == 0 ? _user.totalPrimePoints : totalTeamPoints,
+      rewardPoolYen: totalMembers * 100,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  Future<void> _createTeam(_TeamDraft draft) async {
+    final now = DateTime.now();
+    final newTeam = TeamModel(
+      id: 'team_${now.microsecondsSinceEpoch}',
+      name: draft.name,
+      kind: draft.kind,
+      ownerUserId: _user.id,
+      memberCount: 1,
+      totalSteps: draft.makePrimary ? _user.totalSteps : 0,
+      totalCo2KgSaved: draft.makePrimary ? _user.totalCo2KgSaved : 0,
+      totalPrimePoints: draft.makePrimary ? _user.totalPrimePoints : 0,
+      createdAt: now,
+      updatedAt: now,
+      description: draft.description,
+      countryCode: _user.countryCode,
+      city: _user.city,
+    );
+
+    _teams.add(newTeam);
+
+    if (draft.makePrimary || _teams.length == 1) {
+      _primaryTeam = newTeam;
+      _syncTeamsWithUser();
+    }
+
+    _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
+    _familyTeam = _firstTeamOfKind(TeamKind.family) ?? _primaryTeam;
+    _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
+
+    _rebuildComputedState();
+    await _saveTeams();
+
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  Future<void> _openTermsDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => const _InfoDocumentDialog(
+        title: 'Terms of Service',
+        content: _termsText,
       ),
-      RankEntryModel(
-        id: 'team_2',
-        scope: RankScope.team,
-        rank: 2,
-        name: _familyTeam.name,
-        value: _familyTeam.totalSteps,
-        label: 'Team steps',
-        relatedTeamId: _familyTeam.id,
+    );
+  }
+
+  Future<void> _openPrivacyDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => const _InfoDocumentDialog(
+        title: 'Privacy Policy',
+        content: _privacyText,
       ),
-      RankEntryModel(
-        id: 'team_3',
-        scope: RankScope.team,
-        rank: 3,
-        name: _companyTeam.name,
-        value: 41500,
-        label: 'Team steps',
-        relatedTeamId: _companyTeam.id,
+    );
+  }
+
+  Future<void> _openCommercialLawDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => const _InfoDocumentDialog(
+        title: 'Specified Commercial Transaction Act',
+        content: _commercialLawText,
       ),
-      RankEntryModel(
-        id: 'team_4',
-        scope: RankScope.team,
-        rank: 4,
-        name: 'ZERON Tokyo',
-        value: _companyTeam.totalSteps,
-        label: 'Your current team',
-        isCurrentUser: true,
-        relatedTeamId: _companyTeam.id,
+    );
+  }
+
+  Future<void> _openAntiCheatDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => const _InfoDocumentDialog(
+        title: 'Anti-Cheat Policy',
+        content: _antiCheatText,
       ),
-    ];
+    );
+  }
+
+  String _dateKey(DateTime value) {
+    return '${value.year}${value.month.toString().padLeft(2, '0')}${value.day.toString().padLeft(2, '0')}';
   }
 
   _HomeDemoState _viewState() {
@@ -1504,7 +1525,11 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       _TodayPage(data: data, t: _t),
       _DashboardPage(data: data, t: _t),
       _RankPage(data: data, t: _t),
-      _TeamPage(data: data, t: _t),
+      _TeamPage(
+        data: data,
+        t: _t,
+        onCreateTeam: _createTeam,
+      ),
       _AccountPage(
         data: data,
         t: _t,
@@ -1514,6 +1539,10 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         onSetLanguage: _setLanguage,
         onSetSound: _setSound,
         onSetNotifications: _setNotifications,
+        onOpenTerms: _openTermsDialog,
+        onOpenPrivacy: _openPrivacyDialog,
+        onOpenAntiCheat: _openAntiCheatDialog,
+        onOpenCommercialLaw: _openCommercialLawDialog,
       ),
     ];
 
@@ -1646,6 +1675,15 @@ class _TodayPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final double userGoalProgress =
+        (data.todaySummary.goalProgress).clamp(0.0, 1.0);
+
+    final double globalParticipation =
+        (data.global.activeUsers / 3000000).clamp(0.0, 1.0);
+
+    final double worldEnergy =
+        (data.global.totalStepsToday / 5000000000).clamp(0.0, 1.0);
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
@@ -1667,7 +1705,10 @@ class _TodayPage extends StatelessWidget {
             'You helped Earth today',
             'あなたは今日、地球に貢献しました',
           ),
-          progress: data.todaySummary.goalProgress,
+          progress: userGoalProgress,
+          globalEnergy: worldEnergy,
+          participationDensity: globalParticipation,
+          userEnergy: userGoalProgress,
         ),
         const SizedBox(height: 18),
         Row(
@@ -1918,21 +1959,55 @@ class _TeamPage extends StatelessWidget {
   const _TeamPage({
     required this.data,
     required this.t,
+    required this.onCreateTeam,
   });
 
   final _HomeDemoState data;
   final String Function(String en, String ja) t;
+  final Future<void> Function(_TeamDraft draft) onCreateTeam;
 
   @override
   Widget build(BuildContext context) {
     final teams = [
       data.primaryTeam,
-      data.friendsTeam,
-      data.familyTeam,
-      data.companyTeam,
+      if (data.primaryTeam.id != data.friendsTeam.id) data.friendsTeam,
+      if (data.primaryTeam.id != data.familyTeam.id) data.familyTeam,
+      if (data.primaryTeam.id != data.companyTeam.id) data.companyTeam,
+      ...data.teamRank
+          .where((entry) =>
+              entry.relatedTeamId != null &&
+              entry.relatedTeamId != data.primaryTeam.id &&
+              entry.relatedTeamId != data.friendsTeam.id &&
+              entry.relatedTeamId != data.familyTeam.id &&
+              entry.relatedTeamId != data.companyTeam.id)
+          .map(
+            (entry) => TeamModel(
+              id: entry.relatedTeamId!,
+              name: entry.name,
+              kind: TeamKind.company,
+              ownerUserId: data.user.id,
+              memberCount: 1,
+              totalSteps: entry.value,
+              totalCo2KgSaved:
+                  ZeronImpactCalculator.calculateCo2KgSavedFromSteps(entry.value),
+              totalPrimePoints: (entry.value ~/ 100),
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+              description: 'Saved local team',
+              countryCode: data.user.countryCode,
+              city: data.user.city,
+            ),
+          ),
     ];
 
-    final totalMembers = teams.fold<int>(
+    final uniqueTeams = <String, TeamModel>{};
+    for (final team in teams) {
+      uniqueTeams[team.id] = team;
+    }
+
+    final visibleTeams = uniqueTeams.values.toList();
+
+    final totalMembers = visibleTeams.fold<int>(
       0,
       (sum, team) => sum + team.memberCount,
     );
@@ -1954,7 +2029,7 @@ class _TeamPage extends StatelessWidget {
             Expanded(
               child: _MetricCard(
                 title: t('Active Teams', 'チーム数'),
-                value: _formatNumber(data.global.activeTeams),
+                value: _formatNumber(visibleTeams.length),
                 icon: Icons.groups_outlined,
               ),
             ),
@@ -1970,11 +2045,11 @@ class _TeamPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         ...List.generate(
-          teams.length,
+          visibleTeams.length,
           (index) {
-            final team = teams[index];
+            final team = visibleTeams[index];
             return Padding(
-              padding: EdgeInsets.only(bottom: index == teams.length - 1 ? 0 : 12),
+              padding: EdgeInsets.only(bottom: index == visibleTeams.length - 1 ? 0 : 12),
               child: _TeamCard(
                 team: team,
                 isPrimary: team.id == data.primaryTeam.id,
@@ -1984,7 +2059,10 @@ class _TeamPage extends StatelessWidget {
           },
         ),
         const SizedBox(height: 12),
-        _CreateTeamCard(t: t),
+        _CreateTeamCard(
+          t: t,
+          onCreateTeam: onCreateTeam,
+        ),
       ],
     );
   }
@@ -2000,6 +2078,10 @@ class _AccountPage extends StatelessWidget {
     required this.onSetLanguage,
     required this.onSetSound,
     required this.onSetNotifications,
+    required this.onOpenTerms,
+    required this.onOpenPrivacy,
+    required this.onOpenAntiCheat,
+    required this.onOpenCommercialLaw,
   });
 
   final _HomeDemoState data;
@@ -2010,6 +2092,10 @@ class _AccountPage extends StatelessWidget {
   final Future<void> Function(String value) onSetLanguage;
   final Future<void> Function(bool value) onSetSound;
   final Future<void> Function(bool value) onSetNotifications;
+  final Future<void> Function() onOpenTerms;
+  final Future<void> Function() onOpenPrivacy;
+  final Future<void> Function() onOpenAntiCheat;
+  final Future<void> Function() onOpenCommercialLaw;
 
   @override
   Widget build(BuildContext context) {
@@ -2117,13 +2203,25 @@ class _AccountPage extends StatelessWidget {
           title: t('Legal', '法務'),
           child: Column(
             children: [
-              _SimpleArrowRow(label: t('Terms of Service', '利用規約')),
+              _SimpleArrowRow(
+                label: t('Terms of Service', '利用規約'),
+                onTap: onOpenTerms,
+              ),
               const SizedBox(height: 14),
-              _SimpleArrowRow(label: t('Privacy Policy', 'プライバシーポリシー')),
+              _SimpleArrowRow(
+                label: t('Privacy Policy', 'プライバシーポリシー'),
+                onTap: onOpenPrivacy,
+              ),
               const SizedBox(height: 14),
-              _SimpleArrowRow(label: t('Anti-Cheat Policy', '不正防止ポリシー')),
+              _SimpleArrowRow(
+                label: t('Anti-Cheat Policy', '不正防止ポリシー'),
+                onTap: onOpenAntiCheat,
+              ),
               const SizedBox(height: 14),
-              _SimpleArrowRow(label: t('Commercial Law', '特定商取引法表記')),
+              _SimpleArrowRow(
+                label: t('Commercial Law', '特定商取引法表記'),
+                onTap: onOpenCommercialLaw,
+              ),
             ],
           ),
         ),
@@ -2204,7 +2302,7 @@ class _PageHeader extends StatelessWidget {
   }
 }
 
-class _GlobeHero extends StatelessWidget {
+class _GlobeHero extends StatefulWidget {
   const _GlobeHero({
     required this.title,
     required this.subtitle,
@@ -2212,6 +2310,9 @@ class _GlobeHero extends StatelessWidget {
     required this.centerSuffix,
     required this.bottomLabel,
     required this.progress,
+    required this.globalEnergy,
+    required this.participationDensity,
+    required this.userEnergy,
   });
 
   final String title;
@@ -2220,6 +2321,35 @@ class _GlobeHero extends StatelessWidget {
   final String centerSuffix;
   final String bottomLabel;
   final double progress;
+  final double globalEnergy;
+  final double participationDensity;
+  final double userEnergy;
+
+  @override
+  State<_GlobeHero> createState() => _GlobeHeroState();
+}
+
+class _GlobeHeroState extends State<_GlobeHero>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  double _dragRotation = 0.0;
+  double _dragTilt = -0.18;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 36),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2229,7 +2359,7 @@ class _GlobeHero extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            title,
+            widget.title,
             style: const TextStyle(
               color: Color(0xFFEAFBF2),
               fontSize: 15,
@@ -2239,7 +2369,7 @@ class _GlobeHero extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            subtitle,
+            widget.subtitle,
             style: TextStyle(
               color: Colors.white.withOpacity(0.60),
               fontSize: 12,
@@ -2248,38 +2378,65 @@ class _GlobeHero extends StatelessWidget {
           const SizedBox(height: 18),
           AspectRatio(
             aspectRatio: 1,
-            child: CustomPaint(
-              painter: _EarthPainter(progress: progress),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      centerLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 38,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -1,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, _) {
+                final double autoRotation = _controller.value * math.pi * 2;
+                final double shimmer =
+                    0.5 + (math.sin(_controller.value * math.pi * 2) * 0.5);
+
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onPanUpdate: (details) {
+                    setState(() {
+                      _dragRotation += details.delta.dx * 0.008;
+                      _dragTilt =
+                          (_dragTilt - details.delta.dy * 0.0025).clamp(-0.45, 0.30);
+                    });
+                  },
+                  child: CustomPaint(
+                    painter: _EarthPainter(
+                      progress: widget.progress,
+                      rotation: autoRotation + _dragRotation,
+                      tilt: _dragTilt,
+                      globalEnergy: widget.globalEnergy,
+                      participationDensity: widget.participationDensity,
+                      userEnergy: widget.userEnergy,
+                      shimmer: shimmer,
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.centerLabel,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 38,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.centerSuffix,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.82),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      centerSuffix,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.82),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
-            bottomLabel,
+            widget.bottomLabel,
             style: TextStyle(
               color: Colors.white.withOpacity(0.70),
               fontSize: 13,
@@ -2959,62 +3116,76 @@ class _TeamCard extends StatelessWidget {
 class _CreateTeamCard extends StatelessWidget {
   const _CreateTeamCard({
     required this.t,
+    required this.onCreateTeam,
   });
 
   final String Function(String en, String ja) t;
+  final Future<void> Function(_TeamDraft draft) onCreateTeam;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: _panelDecoration(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFFB8FFE3).withOpacity(0.10),
+    return GestureDetector(
+      onTap: () async {
+        final draft = await showDialog<_TeamDraft>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _CreateTeamDialog(t: t),
+        );
+
+        if (draft == null) return;
+        await onCreateTeam(draft);
+      },
+      child: Container(
+        decoration: _panelDecoration(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFB8FFE3).withOpacity(0.10),
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: Color(0xFFB8FFE3),
+              ),
             ),
-            child: const Icon(
-              Icons.add_rounded,
-              color: Color(0xFFB8FFE3),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t('Create Team', 'チームを作成'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    t(
+                      'Build a new participation unit for friends, family or company.',
+                      'フレンド、ファミリー、会社単位で新しい参加ユニットを作成します。',
+                    ),
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.64),
+                      fontSize: 12.5,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  t('Create Team', 'チームを作成'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  t(
-                    'Build a new participation unit for friends, family or company.',
-                    'フレンド、ファミリー、会社単位で新しい参加ユニットを作成します。',
-                  ),
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.64),
-                    fontSize: 12.5,
-                    height: 1.45,
-                  ),
-                ),
-              ],
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white.withOpacity(0.60),
             ),
-          ),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: Colors.white.withOpacity(0.60),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -3106,29 +3277,40 @@ class _AccountRow extends StatelessWidget {
 class _SimpleArrowRow extends StatelessWidget {
   const _SimpleArrowRow({
     required this.label,
+    required this.onTap,
   });
 
   final String label;
+  final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w500,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () async {
+        await onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
-          ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white.withOpacity(0.60),
+            ),
+          ],
         ),
-        Icon(
-          Icons.chevron_right_rounded,
-          color: Colors.white.withOpacity(0.60),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -3458,167 +3640,265 @@ class _HomeDemoState {
 class _EarthPainter extends CustomPainter {
   const _EarthPainter({
     required this.progress,
+    required this.rotation,
+    required this.tilt,
+    required this.globalEnergy,
+    required this.participationDensity,
+    required this.userEnergy,
+    required this.shimmer,
   });
 
   final double progress;
+  final double rotation;
+  final double tilt;
+  final double globalEnergy;
+  final double participationDensity;
+  final double userEnergy;
+  final double shimmer;
+
+  static const List<_EarthLightPoint> _cityLights = [
+    _EarthLightPoint(lon: -74.0, lat: 40.7, strength: 1.00),
+    _EarthLightPoint(lon: -118.2, lat: 34.0, strength: 0.90),
+    _EarthLightPoint(lon: -87.6, lat: 41.8, strength: 0.72),
+    _EarthLightPoint(lon: -95.3, lat: 29.7, strength: 0.64),
+    _EarthLightPoint(lon: -46.6, lat: -23.5, strength: 0.90),
+    _EarthLightPoint(lon: -58.4, lat: -34.6, strength: 0.62),
+    _EarthLightPoint(lon: -0.1, lat: 51.5, strength: 0.90),
+    _EarthLightPoint(lon: 2.35, lat: 48.85, strength: 0.82),
+    _EarthLightPoint(lon: 13.4, lat: 52.5, strength: 0.70),
+    _EarthLightPoint(lon: 37.6, lat: 55.7, strength: 0.74),
+    _EarthLightPoint(lon: 139.7, lat: 35.6, strength: 1.00),
+    _EarthLightPoint(lon: 135.5, lat: 34.7, strength: 0.68),
+    _EarthLightPoint(lon: 126.9, lat: 37.5, strength: 0.78),
+    _EarthLightPoint(lon: 121.4, lat: 31.2, strength: 0.92),
+    _EarthLightPoint(lon: 116.4, lat: 39.9, strength: 0.80),
+    _EarthLightPoint(lon: 114.1, lat: 22.3, strength: 0.82),
+    _EarthLightPoint(lon: 103.8, lat: 1.35, strength: 0.72),
+    _EarthLightPoint(lon: 77.2, lat: 28.6, strength: 0.82),
+    _EarthLightPoint(lon: 72.8, lat: 19.0, strength: 0.72),
+    _EarthLightPoint(lon: 55.2, lat: 25.2, strength: 0.60),
+    _EarthLightPoint(lon: 31.2, lat: 30.0, strength: 0.56),
+    _EarthLightPoint(lon: 28.0, lat: -26.2, strength: 0.58),
+    _EarthLightPoint(lon: 151.2, lat: -33.8, strength: 0.74),
+  ];
+
+  static const List<_EarthLandEllipse> _landMasses = [
+    _EarthLandEllipse(lon: -105, lat: 48, rx: 26, ry: 18, alpha: 0.90),
+    _EarthLandEllipse(lon: -100, lat: 30, rx: 18, ry: 14, alpha: 0.88),
+    _EarthLandEllipse(lon: -82, lat: 16, rx: 11, ry: 10, alpha: 0.72),
+    _EarthLandEllipse(lon: -60, lat: -15, rx: 18, ry: 26, alpha: 0.88),
+    _EarthLandEllipse(lon: -42, lat: 72, rx: 10, ry: 7, alpha: 0.56),
+    _EarthLandEllipse(lon: 15, lat: 52, rx: 18, ry: 10, alpha: 0.82),
+    _EarthLandEllipse(lon: 20, lat: 10, rx: 20, ry: 27, alpha: 0.88),
+    _EarthLandEllipse(lon: 52, lat: 28, rx: 11, ry: 8, alpha: 0.72),
+    _EarthLandEllipse(lon: 78, lat: 22, rx: 13, ry: 10, alpha: 0.82),
+    _EarthLandEllipse(lon: 102, lat: 44, rx: 34, ry: 20, alpha: 0.92),
+    _EarthLandEllipse(lon: 120, lat: 12, rx: 18, ry: 12, alpha: 0.74),
+    _EarthLandEllipse(lon: 134, lat: -24, rx: 16, ry: 11, alpha: 0.82),
+    _EarthLandEllipse(lon: 47, lat: -19, rx: 7, ry: 11, alpha: 0.60),
+    _EarthLandEllipse(lon: 138, lat: 37, rx: 7, ry: 9, alpha: 0.68),
+  ];
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final radius = size.shortestSide * 0.36;
-    final rect = Offset.zero & size;
+    final Offset center = size.center(Offset.zero);
+    final double radius = size.shortestSide * 0.355;
+    final Rect wholeRect = Offset.zero & size;
+    final Rect globeRect = Rect.fromCircle(center: center, radius: radius);
 
-    final bg = Paint()
-      ..shader = const RadialGradient(
+    final Paint bgGlow = Paint()
+      ..shader = RadialGradient(
         colors: [
-          Color(0xFF0C1A1A),
-          Color(0xFF061012),
+          const Color(0xFF58E9D8).withOpacity(0.22 + (globalEnergy * 0.12)),
+          const Color(0xFF16333C).withOpacity(0.18),
           Colors.transparent,
         ],
-        stops: [0.0, 0.55, 1.0],
-      ).createShader(rect);
+        stops: const [0.0, 0.54, 1.0],
+      ).createShader(wholeRect);
 
-    canvas.drawRect(rect, bg);
+    canvas.drawRect(wholeRect, bgGlow);
 
-    final glow = Paint()
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28)
-      ..color = const Color(0xFF9DFFE3).withOpacity(0.18);
+    final Paint outerAura = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 30)
+      ..color = const Color(0xFF99FFE7)
+          .withOpacity(0.12 + (participationDensity * 0.08));
 
-    canvas.drawCircle(center, radius * 1.05, glow);
+    canvas.drawCircle(center, radius * 1.16, outerAura);
 
-    final earthRect = Rect.fromCircle(center: center, radius: radius);
-
-    final earth = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.18, -0.22),
-        radius: 0.96,
+    final Paint atmosphere = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = radius * 0.045
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
+      ..shader = SweepGradient(
         colors: [
-          const Color(0xFF5BE1D4).withOpacity(0.92),
-          const Color(0xFF12415A).withOpacity(0.96),
-          const Color(0xFF051017),
+          const Color(0xFF94FFF1).withOpacity(0.00),
+          const Color(0xFFB7FFF2).withOpacity(0.75),
+          const Color(0xFF6EF0E0).withOpacity(0.28),
+          const Color(0xFF94FFF1).withOpacity(0.00),
         ],
-        stops: const [0.0, 0.38, 1.0],
-      ).createShader(earthRect);
+        stops: const [0.00, 0.16, 0.58, 1.00],
+        transform: GradientRotation(rotation * 0.45),
+      ).createShader(Rect.fromCircle(center: center, radius: radius * 1.08));
 
-    canvas.drawCircle(center, radius, earth);
+    final Paint ocean = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.24, -0.34),
+        radius: 1.05,
+        colors: [
+          const Color(0xFF7EF7E7).withOpacity(0.82),
+          const Color(0xFF0F5268).withOpacity(0.96),
+          const Color(0xFF04141D),
+        ],
+        stops: const [0.0, 0.34, 1.0],
+      ).createShader(globeRect);
 
-    final continent = Paint()
-      ..color = const Color(0xFF9EF6D6).withOpacity(0.24)
-      ..style = PaintingStyle.fill;
-
-    final continent2 = Paint()
-      ..color = const Color(0xFFC8FFE6).withOpacity(0.18)
-      ..style = PaintingStyle.fill;
-
-    final asia = Path()
-      ..moveTo(center.dx - radius * 0.05, center.dy - radius * 0.28)
-      ..quadraticBezierTo(
-        center.dx + radius * 0.18,
-        center.dy - radius * 0.36,
-        center.dx + radius * 0.24,
-        center.dy - radius * 0.16,
-      )
-      ..quadraticBezierTo(
-        center.dx + radius * 0.32,
-        center.dy - radius * 0.02,
-        center.dx + radius * 0.12,
-        center.dy + radius * 0.12,
-      )
-      ..quadraticBezierTo(
-        center.dx - radius * 0.06,
-        center.dy + radius * 0.02,
-        center.dx - radius * 0.05,
-        center.dy - radius * 0.28,
-      );
-
-    final australia = Path()
-      ..moveTo(center.dx + radius * 0.18, center.dy + radius * 0.24)
-      ..quadraticBezierTo(
-        center.dx + radius * 0.30,
-        center.dy + radius * 0.20,
-        center.dx + radius * 0.28,
-        center.dy + radius * 0.34,
-      )
-      ..quadraticBezierTo(
-        center.dx + radius * 0.18,
-        center.dy + radius * 0.38,
-        center.dx + radius * 0.14,
-        center.dy + radius * 0.28,
-      )
-      ..close();
-
-    final eurasia = Path()
-      ..moveTo(center.dx - radius * 0.32, center.dy - radius * 0.08)
-      ..quadraticBezierTo(
-        center.dx - radius * 0.18,
-        center.dy - radius * 0.24,
-        center.dx - radius * 0.02,
-        center.dy - radius * 0.16,
-      )
-      ..quadraticBezierTo(
-        center.dx - radius * 0.18,
-        center.dy - radius * 0.02,
-        center.dx - radius * 0.30,
-        center.dy + radius * 0.04,
-      )
-      ..quadraticBezierTo(
-        center.dx - radius * 0.36,
-        center.dy - radius * 0.02,
-        center.dx - radius * 0.32,
-        center.dy - radius * 0.08,
-      );
+    canvas.drawCircle(center, radius, ocean);
 
     canvas.save();
-    canvas.clipPath(Path()..addOval(earthRect));
-    canvas.drawPath(asia, continent);
-    canvas.drawPath(australia, continent2);
-    canvas.drawPath(eurasia, continent2);
+    canvas.clipPath(Path()..addOval(globeRect));
 
-    final cloud = Paint()
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
-      ..color = Colors.white.withOpacity(0.05);
+    final Paint deepShadow = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [
+          Colors.black.withOpacity(0.52),
+          Colors.transparent,
+          Colors.black.withOpacity(0.42),
+        ],
+        stops: const [0.0, 0.52, 1.0],
+        transform: GradientRotation(rotation * 0.2),
+      ).createShader(globeRect);
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius * 0.92),
-      -0.8,
-      1.6,
-      false,
-      cloud..style = PaintingStyle.stroke..strokeWidth = radius * 0.08,
-    );
-    canvas.restore();
+    canvas.drawRect(globeRect, deepShadow);
 
-    final ringPaint = Paint()
+    final Paint rimLight = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFFC6FFF5).withOpacity(0.36 + (userEnergy * 0.10)),
+          Colors.transparent,
+          const Color(0xFF5FF0E0).withOpacity(0.10),
+        ],
+      ).createShader(globeRect);
+
+    canvas.drawCircle(center, radius, rimLight);
+
+    final Paint gridPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = const Color(0xFFB8FFE3).withOpacity(0.20);
+      ..strokeWidth = 0.75
+      ..color = Colors.white.withOpacity(0.06);
 
-    for (int i = 0; i < 3; i++) {
-      canvas.drawCircle(center, radius + (14 * (i + 1)), ringPaint);
+    for (int i = -2; i <= 2; i++) {
+      final double lat = i * 22;
+      _drawLatitude(canvas, center, radius, lat.toDouble(), tilt, gridPaint);
     }
 
-    final orbit = Paint()
+    for (int i = 0; i < 8; i++) {
+      final double lon = i * 45.0 + (rotation * 180 / math.pi);
+      _drawLongitude(canvas, center, radius, lon, tilt, gridPaint);
+    }
+
+    for (final land in _landMasses) {
+      _drawLand(canvas, center, radius, land);
+    }
+
+    _drawCityLights(canvas, center, radius);
+
+    final Paint cloudPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1
-      ..color = const Color(0xFFB8FFE3).withOpacity(0.18);
+      ..color = Colors.white.withOpacity(0.07);
 
-    final orbitRect = Rect.fromCenter(
+    for (int i = 0; i < 4; i++) {
+      final double inset = radius * (0.08 + (i * 0.08));
+      canvas.drawArc(
+        Rect.fromLTWH(
+          center.dx - radius + inset,
+          center.dy - radius * 0.72 + (i * 8),
+          (radius - inset) * 2,
+          radius * 1.22 - (i * 12),
+        ),
+        -0.9,
+        2.2,
+        false,
+        cloudPaint,
+      );
+    }
+
+    final Paint vignette = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.transparent,
+          Colors.transparent,
+          Colors.black.withOpacity(0.34),
+        ],
+        stops: const [0.0, 0.68, 1.0],
+      ).createShader(globeRect);
+
+    canvas.drawCircle(center, radius, vignette);
+
+    canvas.restore();
+
+    canvas.drawCircle(center, radius * 1.02, atmosphere);
+
+    final Paint orbitPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.15
+      ..color =
+          const Color(0xFFB8FFE3).withOpacity(0.16 + (globalEnergy * 0.08));
+
+    final Rect orbitA = Rect.fromCenter(
       center: center,
-      width: radius * 2.7,
-      height: radius * 1.05,
+      width: radius * 2.72,
+      height: radius * 1.20,
     );
-    canvas.drawOval(orbitRect, orbit);
+    final Rect orbitB = Rect.fromCenter(
+      center: center,
+      width: radius * 2.38,
+      height: radius * 2.38,
+    );
+    final Rect orbitC = Rect.fromCenter(
+      center: center,
+      width: radius * 2.44,
+      height: radius * 1.62,
+    );
 
-    final progressArc = Paint()
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(0.24 + (rotation * 0.08));
+    canvas.translate(-center.dx, -center.dy);
+    canvas.drawOval(orbitA, orbitPaint);
+    canvas.restore();
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(-0.82 + (rotation * 0.05));
+    canvas.translate(-center.dx, -center.dy);
+    canvas.drawOval(orbitC, orbitPaint);
+    canvas.restore();
+
+    final Paint orbitRing = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.05
+      ..color = Colors.white.withOpacity(0.10);
+
+    canvas.drawOval(orbitB, orbitRing);
+
+    final Paint progressArc = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 5
-      ..shader = const SweepGradient(
+      ..strokeWidth = 5.2
+      ..shader = SweepGradient(
         colors: [
-          Color(0x00B8FFE3),
-          Color(0xFFB8FFE3),
-          Color(0x00B8FFE3),
+          const Color(0x00B8FFE3),
+          const Color(0xFFCCFFF0).withOpacity(0.95),
+          const Color(0xFF70F3E1).withOpacity(0.90),
+          const Color(0x00B8FFE3),
         ],
-        stops: [0.0, 0.5, 1.0],
+        stops: const [0.00, 0.18, 0.54, 1.00],
+        transform: GradientRotation(-math.pi / 2),
       ).createShader(
         Rect.fromCircle(center: center, radius: radius + 22),
       );
@@ -3626,28 +3906,263 @@ class _EarthPainter extends CustomPainter {
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius + 22),
       -math.pi / 2,
-      (math.pi * 2) * progress,
+      math.pi * 2 * progress.clamp(0.0, 1.0),
       false,
       progressArc,
     );
 
-    final stars = Paint()..color = Colors.white.withOpacity(0.50);
-    final random = math.Random(77);
+    final Paint starPaint = Paint()
+      ..color = Colors.white.withOpacity(0.62);
 
-    for (int i = 0; i < 36; i++) {
-      final dx = random.nextDouble() * size.width;
-      final dy = random.nextDouble() * size.height;
-      final d = (Offset(dx, dy) - center).distance;
-      if (d > radius * 1.15) {
-        canvas.drawCircle(Offset(dx, dy), 0.8 + random.nextDouble(), stars);
+    final math.Random random = math.Random(71);
+    for (int i = 0; i < 42; i++) {
+      final double dx = random.nextDouble() * size.width;
+      final double dy = random.nextDouble() * size.height;
+      final Offset point = Offset(dx, dy);
+      if ((point - center).distance > radius * 1.14) {
+        canvas.drawCircle(point, 0.6 + random.nextDouble() * 1.5, starPaint);
       }
     }
+
+    final Paint lensGlow = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20)
+      ..color = const Color(0xFFBFFFF4)
+          .withOpacity(0.04 + ((globalEnergy + shimmer) * 0.025));
+
+    canvas.drawCircle(
+      Offset(center.dx - radius * 0.28, center.dy - radius * 0.42),
+      radius * 0.22,
+      lensGlow,
+    );
+  }
+
+  void _drawLand(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    _EarthLandEllipse land,
+  ) {
+    final _SpherePoint projection = _project(
+      lonDeg: land.lon,
+      latDeg: land.lat,
+      center: center,
+      radius: radius,
+    );
+
+    if (!projection.visible) return;
+
+    final double w = radius * (land.rx / 90) * projection.scale;
+    final double h = radius * (land.ry / 90) * projection.scale * 1.12;
+
+    final Rect rect = Rect.fromCenter(
+      center: projection.offset,
+      width: w * 2.0,
+      height: h * 2.0,
+    );
+
+    final Paint landPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          const Color(0xFFC8FFE0).withOpacity(
+            (0.20 + (participationDensity * 0.08)) * land.alpha * projection.alpha,
+          ),
+          const Color(0xFF9AEBC8).withOpacity(
+            (0.10 + (globalEnergy * 0.08)) * land.alpha * projection.alpha,
+          ),
+          const Color(0xFF6CCCB2).withOpacity(
+            0.05 * land.alpha * projection.alpha,
+          ),
+        ],
+      ).createShader(rect);
+
+    canvas.save();
+    canvas.translate(projection.offset.dx, projection.offset.dy);
+    canvas.rotate(-rotation * 0.06);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: w * 2.0,
+        height: h * 2.0,
+      ),
+      landPaint,
+    );
+    canvas.restore();
+  }
+
+  void _drawCityLights(Canvas canvas, Offset center, double radius) {
+    for (final city in _cityLights) {
+      final _SpherePoint projection = _project(
+        lonDeg: city.lon,
+        latDeg: city.lat,
+        center: center,
+        radius: radius,
+      );
+
+      if (!projection.visible) continue;
+
+      final double intensity = city.strength *
+          (0.30 + (globalEnergy * 0.55) + (participationDensity * 0.22)) *
+          projection.alpha;
+
+      final double glowSize = radius * (0.010 + (city.strength * 0.010));
+
+      final Paint glow = Paint()
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
+        ..color = const Color(0xFFC7FFF1).withOpacity(intensity * 0.42);
+
+      final Paint core = Paint()
+        ..color = const Color(0xFFE7FFF8).withOpacity(intensity * 0.90);
+
+      canvas.drawCircle(projection.offset, glowSize * 3.1, glow);
+      canvas.drawCircle(projection.offset, glowSize, core);
+    }
+  }
+
+  void _drawLatitude(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double latDeg,
+    double tilt,
+    Paint paint,
+  ) {
+    final double y = radius * math.sin(_degToRad(latDeg)) * math.cos(tilt);
+    final double rx = radius * math.cos(_degToRad(latDeg));
+    final double ry = rx * math.cos(tilt);
+
+    final Rect rect = Rect.fromCenter(
+      center: Offset(center.dx, center.dy - y * math.sin(tilt) * 0.18),
+      width: rx * 2,
+      height: ry * 2,
+    );
+
+    canvas.drawOval(rect, paint);
+  }
+
+  void _drawLongitude(
+    Canvas canvas,
+    Offset center,
+    double radius,
+    double lonDeg,
+    double tilt,
+    Paint paint,
+  ) {
+    final Path path = Path();
+    bool started = false;
+
+    for (double lat = -90; lat <= 90; lat += 2) {
+      final _SpherePoint point = _project(
+        lonDeg: lonDeg,
+        latDeg: lat,
+        center: center,
+        radius: radius,
+      );
+
+      if (!point.visible) {
+        started = false;
+        continue;
+      }
+
+      if (!started) {
+        path.moveTo(point.offset.dx, point.offset.dy);
+        started = true;
+      } else {
+        path.lineTo(point.offset.dx, point.offset.dy);
+      }
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  _SpherePoint _project({
+    required double lonDeg,
+    required double latDeg,
+    required Offset center,
+    required double radius,
+  }) {
+    final double lon = _degToRad(lonDeg) + rotation;
+    final double lat = _degToRad(latDeg);
+
+    final double x = math.cos(lat) * math.sin(lon);
+    final double y = math.sin(lat);
+    final double z = math.cos(lat) * math.cos(lon);
+
+    final double yTilt = (y * math.cos(tilt)) - (z * math.sin(tilt));
+    final double zTilt = (y * math.sin(tilt)) + (z * math.cos(tilt));
+
+    final bool visible = zTilt > -0.06;
+    final double alpha = ((zTilt + 1) / 2).clamp(0.18, 1.0);
+    final double scale = (0.84 + (zTilt * 0.18)).clamp(0.72, 1.0);
+
+    return _SpherePoint(
+      visible: visible,
+      alpha: alpha,
+      scale: scale,
+      offset: Offset(
+        center.dx + (x * radius),
+        center.dy - (yTilt * radius),
+      ),
+    );
+  }
+
+  double _degToRad(double deg) {
+    return deg * math.pi / 180.0;
   }
 
   @override
   bool shouldRepaint(covariant _EarthPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+    return oldDelegate.progress != progress ||
+        oldDelegate.rotation != rotation ||
+        oldDelegate.tilt != tilt ||
+        oldDelegate.globalEnergy != globalEnergy ||
+        oldDelegate.participationDensity != participationDensity ||
+        oldDelegate.userEnergy != userEnergy ||
+        oldDelegate.shimmer != shimmer;
   }
+}
+
+class _SpherePoint {
+  const _SpherePoint({
+    required this.visible,
+    required this.alpha,
+    required this.scale,
+    required this.offset,
+  });
+
+  final bool visible;
+  final double alpha;
+  final double scale;
+  final Offset offset;
+}
+
+class _EarthLightPoint {
+  const _EarthLightPoint({
+    required this.lon,
+    required this.lat,
+    required this.strength,
+  });
+
+  final double lon;
+  final double lat;
+  final double strength;
+}
+
+class _EarthLandEllipse {
+  const _EarthLandEllipse({
+    required this.lon,
+    required this.lat,
+    required this.rx,
+    required this.ry,
+    required this.alpha,
+  });
+
+  final double lon;
+  final double lat;
+  final double rx;
+  final double ry;
+  final double alpha;
 }
 
 BoxDecoration _panelDecoration({bool highlighted = false}) {
@@ -3698,4 +4213,181 @@ String _formatNumber(int value) {
 
 String _formatNumberDouble(double value) {
   return _formatNumber(value.round());
+}
+
+class _TeamDraft {
+  const _TeamDraft({
+    required this.name,
+    required this.kind,
+    required this.description,
+    required this.makePrimary,
+  });
+
+  final String name;
+  final TeamKind kind;
+  final String description;
+  final bool makePrimary;
+}
+
+class _CreateTeamDialog extends StatefulWidget {
+  const _CreateTeamDialog({
+    required this.t,
+  });
+
+  final String Function(String en, String ja) t;
+
+  @override
+  State<_CreateTeamDialog> createState() => _CreateTeamDialogState();
+}
+
+class _CreateTeamDialogState extends State<_CreateTeamDialog> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+
+  TeamKind _kind = TeamKind.friends;
+  bool _makePrimary = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _create() {
+    final name = _nameController.text.trim();
+    final description = _descriptionController.text.trim();
+
+    if (name.isEmpty) return;
+
+    Navigator.of(context).pop(
+      _TeamDraft(
+        name: name,
+        kind: _kind,
+        description: description.isEmpty
+            ? widget.t(
+                'Live local team running on this device.',
+                'この端末上で稼働するローカルライブチームです。',
+              )
+            : description,
+        makePrimary: _makePrimary,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF091015),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.t('Create Team', 'チームを作成'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _FormField(
+                controller: _nameController,
+                label: widget.t('Team Name', 'チーム名'),
+              ),
+              const SizedBox(height: 12),
+              _FormField(
+                controller: _descriptionController,
+                label: widget.t('Description', '説明'),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<TeamKind>(
+                    value: _kind,
+                    dropdownColor: const Color(0xFF091015),
+                    style: const TextStyle(color: Colors.white),
+                    items: [
+                      DropdownMenuItem(
+                        value: TeamKind.friends,
+                        child: Text(widget.t('Friends', 'フレンズ')),
+                      ),
+                      DropdownMenuItem(
+                        value: TeamKind.family,
+                        child: Text(widget.t('Family', 'ファミリー')),
+                      ),
+                      DropdownMenuItem(
+                        value: TeamKind.company,
+                        child: Text(widget.t('Company', 'カンパニー')),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _kind = value;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                activeColor: const Color(0xFFB8FFE3),
+                title: Text(
+                  widget.t('Set as Primary Team', 'メインチームに設定'),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                value: _makePrimary,
+                onChanged: (value) {
+                  setState(() {
+                    _makePrimary = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB8FFE3).withOpacity(0.14),
+                    foregroundColor: const Color(0xFFEFFFF8),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: const Color(0xFFB8FFE3).withOpacity(0.22),
+                      ),
+                    ),
+                  ),
+                  onPressed: _create,
+                  child: Text(
+                    widget.t('Create', '作成'),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
