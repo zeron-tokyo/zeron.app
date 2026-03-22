@@ -1,5 +1,3 @@
-import 'dart:math';
-
 /// ===============================
 /// ENUM
 /// ===============================
@@ -78,6 +76,10 @@ class ZeronUser {
     int? totalPrimePoints,
     DateTime? updatedAt,
     DateTime? lastActiveAt,
+    int? worldRank,
+    int? countryRank,
+    int? cityRank,
+    int? teamRank,
   }) {
     return ZeronUser(
       id: id,
@@ -98,10 +100,10 @@ class ZeronUser {
       todaySteps: todaySteps ?? this.todaySteps,
       todayCo2KgSaved: todayCo2KgSaved ?? this.todayCo2KgSaved,
       todayPrimePoints: todayPrimePoints ?? this.todayPrimePoints,
-      worldRank: worldRank,
-      countryRank: countryRank,
-      cityRank: cityRank,
-      teamRank: teamRank,
+      worldRank: worldRank ?? this.worldRank,
+      countryRank: countryRank ?? this.countryRank,
+      cityRank: cityRank ?? this.cityRank,
+      teamRank: teamRank ?? this.teamRank,
     );
   }
 }
@@ -153,22 +155,31 @@ class DailyImpactSummary {
   final int totalSteps;
   final int goalSteps;
 
+  final double totalDistanceKm;
   final double totalCo2KgSaved;
   final int totalPrimePoints;
 
   final bool hasDailyGoalBonus;
+  final bool reachedMilestone5000;
+  final bool reachedMilestone10000;
+  final bool reachedMilestone15000;
 
-  /// UI用
   double get goalProgress =>
       goalSteps == 0 ? 0 : (totalSteps / goalSteps).clamp(0.0, 1.0);
+
+  int get remainingToGoal => goalSteps > totalSteps ? goalSteps - totalSteps : 0;
 
   const DailyImpactSummary({
     required this.dateKey,
     required this.totalSteps,
     required this.goalSteps,
+    required this.totalDistanceKm,
     required this.totalCo2KgSaved,
     required this.totalPrimePoints,
     required this.hasDailyGoalBonus,
+    required this.reachedMilestone5000,
+    required this.reachedMilestone10000,
+    required this.reachedMilestone15000,
   });
 }
 
@@ -277,15 +288,32 @@ class RankEntryModel {
 }
 
 /// ===============================
-/// IMPACT CALCULATOR（中核）
+/// IMPACT CALCULATOR
 /// ===============================
 
 class ZeronImpactCalculator {
+  const ZeronImpactCalculator._();
+
+  /// 1歩あたりの平均移動距離
   static const double _stepLengthKm = 0.00075;
+
+  /// 1km歩行で置換される想定CO2削減量
   static const double _co2PerKm = 0.12;
 
+  /// 100歩あたりの基本ポイント
+  static const int _basePointsPer100Steps = 1;
+
+  /// 1kgのCO2削減あたりのボーナスポイント
+  static const int _pointsPerKgCo2 = 10;
+
+  /// マイルストーンボーナス
+  static const int _milestone5000Bonus = 20;
+  static const int _milestone10000Bonus = 60;
+  static const int _milestone15000Bonus = 120;
+
   static double calculateDistanceKmFromSteps(int steps) {
-    return steps * _stepLengthKm;
+    final safeSteps = steps < 0 ? 0 : steps;
+    return safeSteps * _stepLengthKm;
   }
 
   static double calculateCo2KgSavedFromSteps(int steps) {
@@ -294,7 +322,8 @@ class ZeronImpactCalculator {
   }
 
   static double calculateCo2KgSavedFromDistance(double distanceKm) {
-    return distanceKm * _co2PerKm;
+    final safeDistance = distanceKm < 0 ? 0.0 : distanceKm;
+    return safeDistance * _co2PerKm;
   }
 
   static int calculatePrimePoints({
@@ -302,34 +331,64 @@ class ZeronImpactCalculator {
     required double co2KgSaved,
     required bool hasDailyGoalBonus,
   }) {
-    final base = (steps * 0.01).floor();
-    final co2Bonus = (co2KgSaved * 10).floor();
+    final safeSteps = steps < 0 ? 0 : steps;
+    final safeCo2 = co2KgSaved < 0 ? 0.0 : co2KgSaved;
+
+    final base = (safeSteps ~/ 100) * _basePointsPer100Steps;
+    final co2Bonus = (safeCo2 * _pointsPerKgCo2).floor();
+
+    final milestoneBonus = calculateMilestoneBonus(safeSteps);
     final goalBonus = hasDailyGoalBonus ? 100 : 0;
 
-    return base + co2Bonus + goalBonus;
+    return base + co2Bonus + milestoneBonus + goalBonus;
+  }
+
+  static int calculateMilestoneBonus(int steps) {
+    final safeSteps = steps < 0 ? 0 : steps;
+    int bonus = 0;
+
+    if (safeSteps >= 5000) {
+      bonus += _milestone5000Bonus;
+    }
+    if (safeSteps >= 10000) {
+      bonus += _milestone10000Bonus;
+    }
+    if (safeSteps >= 15000) {
+      bonus += _milestone15000Bonus;
+    }
+
+    return bonus;
   }
 
   static DailyImpactSummary buildDailySummary({
     required String dateKey,
     required int totalSteps,
     required int goalSteps,
-    required bool hasDailyGoalBonus,
   }) {
-    final co2 = calculateCo2KgSavedFromSteps(totalSteps);
+    final safeSteps = totalSteps < 0 ? 0 : totalSteps;
+    final safeGoal = goalSteps <= 0 ? 10000 : goalSteps;
+
+    final distanceKm = calculateDistanceKmFromSteps(safeSteps);
+    final co2 = calculateCo2KgSavedFromDistance(distanceKm);
+    final hasGoalBonus = safeSteps >= safeGoal;
 
     final points = calculatePrimePoints(
-      steps: totalSteps,
+      steps: safeSteps,
       co2KgSaved: co2,
-      hasDailyGoalBonus: hasDailyGoalBonus,
+      hasDailyGoalBonus: hasGoalBonus,
     );
 
     return DailyImpactSummary(
       dateKey: dateKey,
-      totalSteps: totalSteps,
-      goalSteps: goalSteps,
+      totalSteps: safeSteps,
+      goalSteps: safeGoal,
+      totalDistanceKm: distanceKm,
       totalCo2KgSaved: co2,
       totalPrimePoints: points,
-      hasDailyGoalBonus: hasDailyGoalBonus,
+      hasDailyGoalBonus: hasGoalBonus,
+      reachedMilestone5000: safeSteps >= 5000,
+      reachedMilestone10000: safeSteps >= 10000,
+      reachedMilestone15000: safeSteps >= 15000,
     );
   }
 }
