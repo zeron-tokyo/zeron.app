@@ -24,11 +24,11 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
   static const String _termsAcceptedKey = 'zeron_terms_accepted_v1';
 
   late final AnimationController _openingController;
-  Timer? _openingTimer;
 
   bool _showOpening = true;
   bool _isCheckingTerms = false;
   bool _termsAccepted = false;
+  bool _isEntering = false;
 
   @override
   void initState() {
@@ -39,15 +39,32 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
       duration: _openingDuration,
     )..forward();
 
-    _openingTimer = Timer(_openingDuration, _finishOpening);
     _loadTermsState();
   }
 
   @override
   void dispose() {
-    _openingTimer?.cancel();
     _openingController.dispose();
     super.dispose();
+  }
+
+  Future<void> _finishOpening() async {
+    if (!mounted || !_showOpening || _isEntering) return;
+
+    _isEntering = true;
+
+    await _ensureTermsAccepted();
+    if (!mounted) return;
+
+    setState(() {
+      _showOpening = false;
+    });
+
+    _isEntering = false;
+  }
+
+  void _skipOpening() {
+    _finishOpening();
   }
 
   Future<void> _loadTermsState() async {
@@ -959,42 +976,52 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         body: Stack(
           fit: StackFit.expand,
           children: [
-            ZeronNoise(
-              presenceSeconds: _presenceSeconds,
-              ambientStage: 2,
-              interactionEnergy: _interactionEnergy,
-              isPointerInside: _isPointerInside,
+            IgnorePointer(
+              child: ZeronNoise(
+                presenceSeconds: _presenceSeconds,
+                ambientStage: 2,
+                interactionEnergy: _interactionEnergy,
+                isPointerInside: _isPointerInside,
+              ),
             ),
-            ZeronBackground(
-              presenceSeconds: _presenceSeconds,
-              ambientStage: 2,
-              interactionEnergy: _interactionEnergy,
-              pointerPosition: _pointerPosition,
+            IgnorePointer(
+              child: ZeronBackground(
+                presenceSeconds: _presenceSeconds,
+                ambientStage: 2,
+                interactionEnergy: _interactionEnergy,
+                pointerPosition: _pointerPosition,
+              ),
             ),
-            ZeronDistortion(
-              presenceSeconds: _presenceSeconds,
-              ambientStage: 2,
-              interactionEnergy: _interactionEnergy,
-              pointerPosition: _pointerPosition,
+            IgnorePointer(
+              child: ZeronDistortion(
+                presenceSeconds: _presenceSeconds,
+                ambientStage: 2,
+                interactionEnergy: _interactionEnergy,
+                pointerPosition: _pointerPosition,
+              ),
             ),
-            ZeronGlow(
-              presenceSeconds: _presenceSeconds,
-              ambientStage: 2,
-              interactionEnergy: _interactionEnergy,
-              pointerPosition: _pointerPosition,
-              memoryPresence: 0.10,
-              memoryType: _isPointerInside ? 'active' : 'still',
+            IgnorePointer(
+              child: ZeronGlow(
+                presenceSeconds: _presenceSeconds,
+                ambientStage: 2,
+                interactionEnergy: _interactionEnergy,
+                pointerPosition: _pointerPosition,
+                memoryPresence: 0.10,
+                memoryType: _isPointerInside ? 'active' : 'still',
+              ),
             ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFF020406).withOpacity(0.60),
-                    const Color(0xFF040A0E).withOpacity(0.52),
-                    const Color(0xFF010203).withOpacity(0.78),
-                  ],
+            IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      const Color(0xFF020406).withOpacity(0.60),
+                      const Color(0xFF040A0E).withOpacity(0.52),
+                      const Color(0xFF010203).withOpacity(0.78),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1025,7 +1052,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       ),
     );
   }
-
+  
   String _navLabel(int index) {
     switch (index) {
       case 0:
