@@ -21,14 +21,23 @@ class ZeronHomeScreen extends StatefulWidget {
 class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     with SingleTickerProviderStateMixin {
   static const Duration _openingDuration = Duration(milliseconds: 3600);
-  static const String _termsAcceptedKey = 'zeron_terms_accepted_v1';
+
+  static const String _profileCompletedKey = 'zeron_profile_completed_v1';
+  static const String _usernameKey = 'zeron_username_v1';
+  static const String _emailKey = 'zeron_email_v1';
+  static const String _countryKey = 'zeron_country_v1';
+  static const String _regionKey = 'zeron_region_v1';
 
   late final AnimationController _openingController;
 
   bool _showOpening = true;
-  bool _isCheckingTerms = false;
-  bool _termsAccepted = false;
   bool _isEntering = false;
+  bool _profileCompleted = false;
+
+  String _username = '';
+  String _email = '';
+  String _country = '';
+  String _region = '';
 
   @override
   void initState() {
@@ -39,7 +48,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
       duration: _openingDuration,
     )..forward();
 
-    _loadTermsState();
+    _loadOpeningState();
   }
 
   @override
@@ -48,12 +57,39 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     super.dispose();
   }
 
-  Future<void> _loadTermsState() async {
+  Future<void> _loadOpeningState() async {
     final prefs = await SharedPreferences.getInstance();
-    final accepted = prefs.getBool(_termsAcceptedKey) ?? false;
+
     if (!mounted) return;
     setState(() {
-      _termsAccepted = accepted;
+      _profileCompleted = prefs.getBool(_profileCompletedKey) ?? false;
+      _username = prefs.getString(_usernameKey) ?? '';
+      _email = prefs.getString(_emailKey) ?? '';
+      _country = prefs.getString(_countryKey) ?? '';
+      _region = prefs.getString(_regionKey) ?? '';
+    });
+  }
+
+  Future<void> _persistProfile({
+    required String username,
+    required String email,
+    required String country,
+    required String region,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_profileCompletedKey, true);
+    await prefs.setString(_usernameKey, username);
+    await prefs.setString(_emailKey, email);
+    await prefs.setString(_countryKey, country);
+    await prefs.setString(_regionKey, region);
+
+    if (!mounted) return;
+    setState(() {
+      _profileCompleted = true;
+      _username = username;
+      _email = email;
+      _country = country;
+      _region = region;
     });
   }
 
@@ -62,9 +98,6 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
 
     _isEntering = true;
 
-    await _ensureTermsAccepted();
-    if (!mounted) return;
-
     setState(() {
       _showOpening = false;
     });
@@ -72,41 +105,109 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     _isEntering = false;
   }
 
-  Future<void> _ensureTermsAccepted() async {
-    if (!mounted || _termsAccepted || _isCheckingTerms) return;
+  Future<void> _handleOpeningTap() async {
+    if (_isEntering) return;
 
-    _isCheckingTerms = true;
+    if (!_profileCompleted) {
+      final result = await showDialog<_RegistrationResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _RegistrationDialog(
+          initialUsername: _username,
+          initialEmail: _email,
+          initialCountry: _country,
+          initialRegion: _region,
+        ),
+      );
 
-    await showDialog<void>(
+      if (result == null) return;
+
+      await _persistProfile(
+        username: result.username,
+        email: result.email,
+        country: result.country,
+        region: result.region,
+      );
+    }
+
+    await _finishOpening();
+  }
+
+  Future<void> _openSettingsSheet() async {
+    await showModalBottomSheet<void>(
       context: context,
-      barrierDismissible: false,
+      backgroundColor: const Color(0xFF091015),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (context) {
-        return _TermsDialog(
-          onAccept: () async {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool(_termsAcceptedKey, true);
-
-            if (mounted) {
-              setState(() {
-                _termsAccepted = true;
-              });
-            }
-
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            }
+        return _OpeningSettingsSheet(
+          username: _username,
+          email: _email,
+          country: _country,
+          region: _region,
+          onOpenAccountInfo: () async {
+            Navigator.of(context).pop();
+            await showDialog<void>(
+              context: this.context,
+              builder: (_) => _InfoDocumentDialog(
+                title: 'Account Information',
+                content: _buildAccountInfoText(),
+              ),
+            );
+          },
+          onOpenCommercialLaw: () async {
+            Navigator.of(context).pop();
+            await showDialog<void>(
+              context: this.context,
+              builder: (_) => const _InfoDocumentDialog(
+                title: 'Specified Commercial Transaction Act',
+                content: _commercialLawText,
+              ),
+            );
+          },
+          onOpenTerms: () async {
+            Navigator.of(context).pop();
+            await showDialog<void>(
+              context: this.context,
+              builder: (_) => const _InfoDocumentDialog(
+                title: 'Terms of Service',
+                content: _termsText,
+              ),
+            );
+          },
+          onOpenPrivacy: () async {
+            Navigator.of(context).pop();
+            await showDialog<void>(
+              context: this.context,
+              builder: (_) => const _InfoDocumentDialog(
+                title: 'Privacy Policy',
+                content: _privacyText,
+              ),
+            );
           },
         );
       },
     );
-
-    _isCheckingTerms = false;
   }
 
-  void _skipOpening() {
-    _finishOpening();
+  String _buildAccountInfoText() {
+    return '''
+Username
+${_username.isEmpty ? 'Not registered' : _username}
+
+Email
+${_email.isEmpty ? 'Not registered' : _email}
+
+Country
+${_country.isEmpty ? 'Not registered' : _country}
+
+Region
+${_region.isEmpty ? 'Not registered' : _region}
+''';
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -119,7 +220,8 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
             ? _OpeningScene(
                 key: const ValueKey<String>('opening'),
                 controller: _openingController,
-                onSkip: _skipOpening,
+                onPrimaryTap: _handleOpeningTap,
+                onOpenSettings: _openSettingsSheet,
               )
             : const _ZeronMainShell(
                 key: ValueKey<String>('main-shell'),
@@ -133,11 +235,13 @@ class _OpeningScene extends StatelessWidget {
   const _OpeningScene({
     super.key,
     required this.controller,
-    required this.onSkip,
+    required this.onPrimaryTap,
+    required this.onOpenSettings,
   });
 
   final AnimationController controller;
-  final VoidCallback onSkip;
+  final Future<void> Function() onPrimaryTap;
+  final Future<void> Function() onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +256,7 @@ class _OpeningScene extends StatelessWidget {
             Curves.easeOutCubic.transform(((t - 0.16) / 0.34).clamp(0.0, 1.0));
         final double logoOpacity =
             Curves.easeOutCubic.transform(((t - 0.28) / 0.30).clamp(0.0, 1.0));
-        final double titleOpacity =
+        final double infoOpacity =
             Curves.easeOutCubic.transform(((t - 0.44) / 0.24).clamp(0.0, 1.0));
         final double footerOpacity =
             Curves.easeOutCubic.transform(((t - 0.62) / 0.20).clamp(0.0, 1.0));
@@ -160,7 +264,9 @@ class _OpeningScene extends StatelessWidget {
 
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: onSkip,
+          onTap: () async {
+            await onPrimaryTap();
+          },
           child: ColoredBox(
             color: Colors.black,
             child: Stack(
@@ -218,30 +324,21 @@ class _OpeningScene extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
+                        const Spacer(),
                         Opacity(
-                          opacity: titleOpacity,
-                          child: const Text(
-                            'ZERON',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              letterSpacing: 7,
-                              fontWeight: FontWeight.w300,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        Opacity(
-                          opacity: titleOpacity,
-                          child: Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: const [
-                              _OpeningChip(label: 'Version 1.0.0'),
-                              _OpeningChip(label: 'Settings inside Account'),
-                              _OpeningChip(label: 'Account ready'),
+                          opacity: infoOpacity,
+                          child: const Column(
+                            children: [
+                              Text(
+                                'Version 1.0.0',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  letterSpacing: 0.8,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -271,26 +368,25 @@ class _OpeningScene extends StatelessWidget {
                                   letterSpacing: 0.2,
                                 ),
                               ),
-                              const SizedBox(height: 24),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.06),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.12),
+                              const SizedBox(height: 26),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () async {
+                                  await onOpenSettings();
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 8,
                                   ),
-                                ),
-                                child: Text(
-                                  'Tap to enter',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.70),
-                                    fontSize: 11,
-                                    letterSpacing: 1.4,
-                                    fontWeight: FontWeight.w500,
+                                  child: Text(
+                                    'Setting',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.92),
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.3,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -310,32 +406,516 @@ class _OpeningScene extends StatelessWidget {
   }
 }
 
-class _OpeningChip extends StatelessWidget {
-  const _OpeningChip({required this.label});
+class _RegistrationResult {
+  const _RegistrationResult({
+    required this.username,
+    required this.email,
+    required this.country,
+    required this.region,
+  });
 
-  final String label;
+  final String username;
+  final String email;
+  final String country;
+  final String region;
+}
+
+class _RegistrationDialog extends StatefulWidget {
+  const _RegistrationDialog({
+    required this.initialUsername,
+    required this.initialEmail,
+    required this.initialCountry,
+    required this.initialRegion,
+  });
+
+  final String initialUsername;
+  final String initialEmail;
+  final String initialCountry;
+  final String initialRegion;
+
+  @override
+  State<_RegistrationDialog> createState() => _RegistrationDialogState();
+}
+
+class _RegistrationDialogState extends State<_RegistrationDialog> {
+  late final TextEditingController _usernameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _countryController;
+  late final TextEditingController _regionController;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController = TextEditingController(text: widget.initialUsername);
+    _emailController = TextEditingController(text: widget.initialEmail);
+    _countryController = TextEditingController(text: widget.initialCountry);
+    _regionController = TextEditingController(text: widget.initialRegion);
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _countryController.dispose();
+    _regionController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final country = _countryController.text.trim();
+    final region = _regionController.text.trim();
+
+    if (username.isEmpty ||
+        email.isEmpty ||
+        country.isEmpty ||
+        region.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please complete all fields.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _RegistrationResult(
+        username: username,
+        email: email,
+        country: country,
+        region: region,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+    return Dialog(
+      backgroundColor: const Color(0xFF091015),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: Colors.white.withOpacity(0.08)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.76),
-          fontSize: 10.5,
-          letterSpacing: 0.8,
-          fontWeight: FontWeight.w500,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Create your account',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Set your identity for ranking, regional participation, and future rewards.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.70),
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _FormField(
+                controller: _usernameController,
+                label: 'Username',
+              ),
+              const SizedBox(height: 12),
+              _FormField(
+                controller: _emailController,
+                label: 'Email address',
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 12),
+              _FormField(
+                controller: _countryController,
+                label: 'Country',
+              ),
+              const SizedBox(height: 12),
+              _FormField(
+                controller: _regionController,
+                label: 'Region',
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB8FFE3).withOpacity(0.14),
+                    foregroundColor: const Color(0xFFEFFFF8),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: const Color(0xFFB8FFE3).withOpacity(0.22),
+                      ),
+                    ),
+                  ),
+                  onPressed: _submit,
+                  child: const Text(
+                    'Continue',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+class _FormField extends StatelessWidget {
+  const _FormField({
+    required this.controller,
+    required this.label,
+    this.keyboardType,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: Colors.white.withOpacity(0.60)),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.04),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: const Color(0xFFB8FFE3).withOpacity(0.24),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OpeningSettingsSheet extends StatelessWidget {
+  const _OpeningSettingsSheet({
+    required this.username,
+    required this.email,
+    required this.country,
+    required this.region,
+    required this.onOpenAccountInfo,
+    required this.onOpenCommercialLaw,
+    required this.onOpenTerms,
+    required this.onOpenPrivacy,
+  });
+
+  final String username;
+  final String email;
+  final String country;
+  final String region;
+  final Future<void> Function() onOpenAccountInfo;
+  final Future<void> Function() onOpenCommercialLaw;
+  final Future<void> Function() onOpenTerms;
+  final Future<void> Function() onOpenPrivacy;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 42,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Setting',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _SettingsRow(
+              label: 'Account information',
+              value: username.isEmpty ? 'Not registered' : username,
+              onTap: onOpenAccountInfo,
+            ),
+            const SizedBox(height: 10),
+            _SettingsRow(
+              label: 'Specified Commercial Transaction Act',
+              onTap: onOpenCommercialLaw,
+            ),
+            const SizedBox(height: 10),
+            _SettingsRow(
+              label: 'Terms of Service',
+              onTap: onOpenTerms,
+            ),
+            const SizedBox(height: 10),
+            _SettingsRow(
+              label: 'Privacy Policy',
+              onTap: onOpenPrivacy,
+            ),
+            const SizedBox(height: 10),
+            if (email.isNotEmpty || country.isNotEmpty || region.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                ),
+                child: Text(
+                  [
+                    if (email.isNotEmpty) email,
+                    if (country.isNotEmpty) country,
+                    if (region.isNotEmpty) region,
+                  ].join(' · '),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.68),
+                    fontSize: 12.5,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.label,
+    required this.onTap,
+    this.value,
+  });
+
+  final String label;
+  final String? value;
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        await onTap();
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (value != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      value!,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.58),
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white.withOpacity(0.60),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoDocumentDialog extends StatelessWidget {
+  const _InfoDocumentDialog({
+    required this.title,
+    required this.content,
+  });
+
+  final String title;
+  final String content;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF091015),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        child: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 420),
+                child: SingleChildScrollView(
+                  child: Text(
+                    content,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.74),
+                      fontSize: 13,
+                      height: 1.65,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.08),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text(
+                    'Close',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+const String _commercialLawText = '''
+Seller
+ZERON TOKYO
+
+Representative
+Hiroyuki Sugiura
+
+Contact Email
+support@zeron.tokyo
+
+Service Price
+Displayed on each purchase or subscription page.
+
+Additional Fees
+Internet connection fees and communication charges are borne by the user.
+
+Payment Timing
+Charged at the time of subscription or purchase confirmation.
+
+Service Delivery Timing
+Access is granted immediately after payment confirmation unless otherwise stated.
+
+Cancellation
+Users may cancel recurring subscriptions from the platform settings before the next billing date.
+
+Refund Policy
+Due to the nature of digital services, completed payments are generally non-refundable unless required by applicable law.
+
+Operating Environment
+A supported smartphone, operating system, and internet connection are required.
+''';
+
+const String _termsText = '''
+These Terms of Service govern access to ZERON and related participation features.
+
+1. Users may create an account and participate in walking-based environmental initiatives.
+2. Users must provide accurate registration information.
+3. Fraudulent step activity, identity abuse, or system exploitation may result in suspension.
+4. Future rewards, campaigns, and sponsor programs may have additional rules.
+5. ZERON may update features, policies, and service details to improve platform operations.
+6. Continued use of the service constitutes agreement to the latest terms.
+''';
+
+const String _privacyText = '''
+ZERON collects limited account and participation data to operate rankings, community participation, and future environmental reward features.
+
+Collected Information
+- Username
+- Email address
+- Country
+- Region
+- Walking participation data
+- Device and app usage data required for service stability
+
+Purpose of Use
+- Account creation and management
+- Ranking and regional participation features
+- Fraud prevention
+- Service improvement
+- Future campaign and reward operations
+
+Data Sharing
+ZERON does not sell personal information. Data may be shared only when required by law or when necessary to provide the service through trusted infrastructure partners.
+
+User Rights
+Users may request correction or deletion of stored personal information subject to applicable law and operational requirements.
+''';
 
 class _ZeronMainShell extends StatefulWidget {
   const _ZeronMainShell({super.key});
