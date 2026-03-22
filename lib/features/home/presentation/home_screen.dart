@@ -48,6 +48,15 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     super.dispose();
   }
 
+  Future<void> _loadTermsState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final accepted = prefs.getBool(_termsAcceptedKey) ?? false;
+    if (!mounted) return;
+    setState(() {
+      _termsAccepted = accepted;
+    });
+  }
+
   Future<void> _finishOpening() async {
     if (!mounted || !_showOpening || _isEntering) return;
 
@@ -61,29 +70,6 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
     });
 
     _isEntering = false;
-  }
-
-  void _skipOpening() {
-    _finishOpening();
-  }
-
-  Future<void> _loadTermsState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final accepted = prefs.getBool(_termsAcceptedKey) ?? false;
-    if (!mounted) return;
-    setState(() {
-      _termsAccepted = accepted;
-    });
-  }
-
-  Future<void> _finishOpening() async {
-    if (!mounted || !_showOpening) return;
-
-    setState(() {
-      _showOpening = false;
-    });
-
-    await _ensureTermsAccepted();
   }
 
   Future<void> _ensureTermsAccepted() async {
@@ -118,11 +104,9 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
   }
 
   void _skipOpening() {
-    _openingTimer?.cancel();
-    _openingController.stop();
     _finishOpening();
   }
-
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1052,7 +1036,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       ),
     );
   }
-  
+
   String _navLabel(int index) {
     switch (index) {
       case 0:

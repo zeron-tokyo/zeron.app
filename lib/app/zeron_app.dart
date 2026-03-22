@@ -40,7 +40,7 @@ class ZeronApp extends StatelessWidget {
         onSecondary: baseBlack,
         onSurface: softWhite,
       ),
-      scaffoldMessengerTheme: const ScaffoldMessengerThemeData(
+      snackBarTheme: const SnackBarThemeData(
         backgroundColor: panelStrong,
         contentTextStyle: TextStyle(
           color: softWhite,
