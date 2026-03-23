@@ -970,7 +970,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
   late GlobalImpactSnapshot _global;
   late TeamModel _primaryTeam;
   late TeamModel _friendsTeam;
-  late TeamModel _familyTeam;
+  late TeamModel _coreTeam;
   late TeamModel _companyTeam;
   late List<RankEntryModel> _worldRank;
   late List<RankEntryModel> _countryRank;
@@ -1134,7 +1134,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         TeamModel(
           id: 'team_${now.microsecondsSinceEpoch}',
           name: 'My Team',
-          kind: TeamKind.company,
+          kind: TeamKind.team,
           ownerUserId: _user.id,
           memberCount: 1,
           totalSteps: _user.totalSteps,
@@ -1157,7 +1157,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     );
 
     _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
-    _familyTeam = _firstTeamOfKind(TeamKind.family) ?? _primaryTeam;
+    _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
     _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
 
     _monthlyEventTitle = 'Daily Earth Impact';
@@ -1185,7 +1185,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
 
           final kind = switch (parts[2]) {
             'friends' => TeamKind.friends,
-            'family' => TeamKind.family,
+            'team' => TeamKind.team,
             _ => TeamKind.company,
           };
 
@@ -1218,7 +1218,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
             team.name,
             switch (team.kind) {
               TeamKind.friends => 'friends',
-              TeamKind.family => 'family',
+              TeamKind.team => 'team',
               TeamKind.company => 'company',
             },
             '${team.memberCount}',
@@ -1314,7 +1314,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     }
 
     _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
-    _familyTeam = _firstTeamOfKind(TeamKind.family) ?? _primaryTeam;
+    _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
     _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
   }
 
@@ -1340,14 +1340,16 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       updatedAt: DateTime.now(),
     );
 
+    final int todayCo2Grams = (_user.todayCo2KgSaved * 1000).round();
+
     _worldRank = <RankEntryModel>[
       RankEntryModel(
         id: 'world_you',
         scope: RankScope.world,
         rank: 1,
         name: _user.displayName ?? 'You',
-        value: _user.todaySteps,
-        label: 'Live device steps',
+        value: todayCo2Grams,
+        label: '${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
         isCurrentUser: true,
         relatedUserId: _user.id,
       ),
@@ -1359,8 +1361,8 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         scope: RankScope.country,
         rank: 1,
         name: _user.displayName ?? 'You',
-        value: _user.todaySteps,
-        label: _user.countryName,
+        value: todayCo2Grams,
+        label: '${_user.countryName} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
         isCurrentUser: true,
         relatedUserId: _user.id,
       ),
@@ -1372,14 +1374,16 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         scope: RankScope.city,
         rank: 1,
         name: _user.displayName ?? 'You',
-        value: _user.todaySteps,
-        label: _user.city,
+        value: todayCo2Grams,
+        label: '${_user.city} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
         isCurrentUser: true,
         relatedUserId: _user.id,
       ),
     ];
 
-    final sortedTeams = [..._teams]..sort((a, b) => b.totalSteps.compareTo(a.totalSteps));
+    final sortedTeams = [..._teams]
+      ..sort((a, b) => b.totalCo2KgSaved.compareTo(a.totalCo2KgSaved));
+
     _teamRank = List<RankEntryModel>.generate(
       sortedTeams.length,
       (index) {
@@ -1389,14 +1393,14 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
           scope: RankScope.team,
           rank: index + 1,
           name: team.name,
-          value: team.totalSteps,
-          label: team.id == _primaryTeam.id ? 'Primary live team' : 'Local team',
+          value: (team.totalCo2KgSaved * 1000).round(),
+          label:
+              '${team.totalCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(team.totalSteps)} steps',
           isCurrentUser: team.id == _primaryTeam.id,
           relatedTeamId: team.id,
         );
       },
     );
-
     _sponsorReadyUsers = 1;
     _monthlyEventTitle = activeTeams > 1 ? 'Team Impact Live' : 'Solo Impact Live';
     _monthlyEventDescription =
@@ -1443,7 +1447,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     }
 
     _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
-    _familyTeam = _firstTeamOfKind(TeamKind.family) ?? _primaryTeam;
+    _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
     _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
 
     _rebuildComputedState();
@@ -1504,7 +1508,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       global: _global,
       primaryTeam: _primaryTeam,
       friendsTeam: _friendsTeam,
-      familyTeam: _familyTeam,
+      coreTeam: _coreTeam,
       companyTeam: _companyTeam,
       worldRank: _worldRank,
       countryRank: _countryRank,
@@ -1715,10 +1719,31 @@ class _TodayPage extends StatelessWidget {
           children: [
             Expanded(
               child: _MetricCard(
-                title: t('CO₂ Saved', 'CO₂削減量'),
-                value:
-                    '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
+                title: t('Today Steps', '今日の歩数'),
+                value: _formatNumber(data.todaySummary.totalSteps),
+                icon: Icons.directions_walk_rounded,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MetricCard(
+                title: t('Today CO₂ Reduction', '今日のCO₂削減量'),
+                value: '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
                 icon: Icons.eco_outlined,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                title: t('Goal Progress', '目標進捗'),
+                value: '${(data.todaySummary.goalProgress * 100).round()}%',
+                icon: Icons.track_changes_rounded,
+                subtitle:
+                    '${_formatNumber(data.todaySummary.totalSteps)} / ${_formatNumber(data.todaySummary.goalSteps)} ${t('steps', '歩')}',
               ),
             ),
             const SizedBox(width: 12),
@@ -1727,6 +1752,26 @@ class _TodayPage extends StatelessWidget {
                 title: t('Prime Points', 'プライムポイント'),
                 value: _formatNumber(data.todaySummary.totalPrimePoints),
                 icon: Icons.bolt_outlined,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                title: t('Sync Status', '同期ステータス'),
+                value: StepService.syncStatus,
+                icon: Icons.sync_rounded,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _MetricCard(
+                title: t('Data Source', 'データソース'),
+                value: StepService.dataSource,
+                icon: Icons.sensors_rounded,
               ),
             ),
           ],
@@ -1784,44 +1829,75 @@ class _DashboardPage extends StatelessWidget {
         const SizedBox(height: 18),
         _DashboardHero(data: data, t: t),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _MetricCard(
-                title: t('Active Walkers', 'アクティブユーザー'),
-                value: _formatNumber(data.global.activeUsers),
-                icon: Icons.groups_2_outlined,
+        _SectionCard(
+          title: t('Today', '今日'),
+          child: Column(
+            children: [
+              _SignalRow(
+                label: t('Steps', '歩数'),
+                value: _formatNumber(data.todaySummary.totalSteps),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _MetricCard(
-                title: t('Countries', '参加国数'),
-                value: _formatNumber(data.global.activeCountries),
-                icon: Icons.public_outlined,
+              const SizedBox(height: 10),
+              _SignalRow(
+                label: t('CO₂ Reduction', 'CO₂削減量'),
+                value: '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              _SignalRow(
+                label: t('Prime Points', 'プライムポイント'),
+                value: _formatNumber(data.todaySummary.totalPrimePoints),
+              ),
+              const SizedBox(height: 10),
+              _SignalRow(
+                label: t('Goal Progress', '目標進捗'),
+                value: '${(data.todaySummary.goalProgress * 100).round()}%',
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _MetricCard(
-                title: t('Monthly Steps', '月間歩数'),
-                value: _formatNumber(data.global.totalStepsThisMonth),
-                icon: Icons.bar_chart_outlined,
+        _SectionCard(
+          title: t('This Week', '今週'),
+          child: Column(
+            children: [
+              _SignalRow(
+                label: t('Steps', '歩数'),
+                value: _formatNumber(data.todaySummary.totalSteps * 7),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _MetricCard(
-                title: t('CO₂ Saved Total', '総CO₂削減'),
-                value: '${_formatNumberDouble(data.global.totalCo2KgSaved)} kg',
-                icon: Icons.forest_outlined,
+              const SizedBox(height: 10),
+              _SignalRow(
+                label: t('CO₂ Reduction', 'CO₂削減量'),
+                value: '${(data.todaySummary.totalCo2KgSaved * 7).toStringAsFixed(2)} kg',
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              _SignalRow(
+                label: t('Prime Points', 'プライムポイント'),
+                value: _formatNumber(data.todaySummary.totalPrimePoints * 7),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _SectionCard(
+          title: t('This Month', '今月'),
+          child: Column(
+            children: [
+              _SignalRow(
+                label: t('Steps', '歩数'),
+                value: _formatNumber(data.user.totalSteps),
+              ),
+              const SizedBox(height: 10),
+              _SignalRow(
+                label: t('CO₂ Reduction', 'CO₂削減量'),
+                value: '${data.user.totalCo2KgSaved.toStringAsFixed(2)} kg',
+              ),
+              const SizedBox(height: 10),
+              _SignalRow(
+                label: t('Prime Points', 'プライムポイント'),
+                value: _formatNumber(data.user.totalPrimePoints),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         _SectionCard(
@@ -1841,6 +1917,11 @@ class _DashboardPage extends StatelessWidget {
               _SignalRow(
                 label: t('Reward Reserve', '報酬準備量'),
                 value: '¥${_formatNumber(data.global.rewardPoolYen)}',
+              ),
+              const SizedBox(height: 10),
+              _SignalRow(
+                label: t('Data Source', 'データソース'),
+                value: StepService.dataSource,
               ),
             ],
           ),
@@ -1943,7 +2024,7 @@ class _RankPageState extends State<_RankPage> {
               child: _RankTile(
                 rank: entry.rank,
                 name: entry.name,
-                value: _formatNumber(entry.value),
+                value: '${(entry.value / 1000).toStringAsFixed(2)} kg',
                 badge: entry.label,
                 highlighted: entry.isCurrentUser,
               ),
@@ -1971,20 +2052,20 @@ class _TeamPage extends StatelessWidget {
     final teams = [
       data.primaryTeam,
       if (data.primaryTeam.id != data.friendsTeam.id) data.friendsTeam,
-      if (data.primaryTeam.id != data.familyTeam.id) data.familyTeam,
+      if (data.primaryTeam.id != data.coreTeam.id) data.coreTeam,
       if (data.primaryTeam.id != data.companyTeam.id) data.companyTeam,
       ...data.teamRank
           .where((entry) =>
               entry.relatedTeamId != null &&
               entry.relatedTeamId != data.primaryTeam.id &&
               entry.relatedTeamId != data.friendsTeam.id &&
-              entry.relatedTeamId != data.familyTeam.id &&
+              entry.relatedTeamId != data.coreTeam.id &&
               entry.relatedTeamId != data.companyTeam.id)
           .map(
             (entry) => TeamModel(
               id: entry.relatedTeamId!,
               name: entry.name,
-              kind: TeamKind.company,
+              kind: TeamKind.team,
               ownerUserId: data.user.id,
               memberCount: 1,
               totalSteps: entry.value,
@@ -2749,6 +2830,47 @@ class _SignalRow extends StatelessWidget {
   }
 }
 
+class _DualMetricGrid extends StatelessWidget {
+  const _DualMetricGrid({
+    required this.leftTitle,
+    required this.leftValue,
+    required this.leftIcon,
+    required this.rightTitle,
+    required this.rightValue,
+    required this.rightIcon,
+  });
+
+  final String leftTitle;
+  final String leftValue;
+  final IconData leftIcon;
+  final String rightTitle;
+  final String rightValue;
+  final IconData rightIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _MetricCard(
+            title: leftTitle,
+            value: leftValue,
+            icon: leftIcon,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _MetricCard(
+            title: rightTitle,
+            value: rightValue,
+            icon: rightIcon,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _MetricLine extends StatelessWidget {
   const _MetricLine({
     required this.label,
@@ -3008,8 +3130,8 @@ class _TeamCard extends StatelessWidget {
     switch (team.kind) {
       case TeamKind.friends:
         return t('Friends', 'フレンズ');
-      case TeamKind.family:
-        return t('Family', 'ファミリー');
+      case TeamKind.team:
+        return t('Team', 'チーム');
       case TeamKind.company:
         return t('Company', 'カンパニー');
     }
@@ -3168,8 +3290,8 @@ class _CreateTeamCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     t(
-                      'Build a new participation unit for friends, family or company.',
-                      'フレンド、ファミリー、会社単位で新しい参加ユニットを作成します。',
+                      'Build a new participation unit for friends, team or company.',
+                      'フレンド、チーム、会社単位で新しい参加ユニットを作成します。',
                     ),
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.64),
@@ -3608,7 +3730,7 @@ class _HomeDemoState {
     required this.global,
     required this.primaryTeam,
     required this.friendsTeam,
-    required this.familyTeam,
+    required this.coreTeam,
     required this.companyTeam,
     required this.worldRank,
     required this.countryRank,
@@ -3625,7 +3747,7 @@ class _HomeDemoState {
   final GlobalImpactSnapshot global;
   final TeamModel primaryTeam;
   final TeamModel friendsTeam;
-  final TeamModel familyTeam;
+  final TeamModel coreTeam;
   final TeamModel companyTeam;
   final List<RankEntryModel> worldRank;
   final List<RankEntryModel> countryRank;
@@ -4244,7 +4366,7 @@ class _CreateTeamDialogState extends State<_CreateTeamDialog> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
-  TeamKind _kind = TeamKind.friends;
+  TeamKind _kind = TeamKind.team;
   bool _makePrimary = false;
 
   @override
@@ -4327,8 +4449,8 @@ class _CreateTeamDialogState extends State<_CreateTeamDialog> {
                         child: Text(widget.t('Friends', 'フレンズ')),
                       ),
                       DropdownMenuItem(
-                        value: TeamKind.family,
-                        child: Text(widget.t('Family', 'ファミリー')),
+                        value: TeamKind.team,
+                        child: Text(widget.t('Team', 'チーム')),
                       ),
                       DropdownMenuItem(
                         value: TeamKind.company,
