@@ -4,7 +4,7 @@
 
 enum ZeronPlan { free, plus, sponsor }
 
-enum TeamKind { friends, family, company }
+enum TeamKind { friends, team, company }
 
 enum RankScope { world, country, city, team }
 

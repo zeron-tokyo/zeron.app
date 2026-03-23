@@ -152,8 +152,12 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
             await showDialog<void>(
               context: this.context,
               builder: (_) => _InfoDocumentDialog(
-                title: 'Account Information',
-                content: _buildAccountInfoText(),
+                document: _LocalizedDocument(
+                  titleEn: 'Account Information',
+                  titleJa: 'アカウント情報',
+                  bodyEn: _buildAccountInfoText(),
+                  bodyJa: _buildAccountInfoText(),
+                ),
               ),
             );
           },
@@ -162,8 +166,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
             await showDialog<void>(
               context: this.context,
               builder: (_) => const _InfoDocumentDialog(
-                title: 'Specified Commercial Transaction Act',
-                content: _commercialLawText,
+                document: _commercialLawDocument,
               ),
             );
           },
@@ -172,8 +175,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
             await showDialog<void>(
               context: this.context,
               builder: (_) => const _InfoDocumentDialog(
-                title: 'Terms of Service',
-                content: _termsText,
+                document: _termsDocument,
               ),
             );
           },
@@ -182,8 +184,7 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
             await showDialog<void>(
               context: this.context,
               builder: (_) => const _InfoDocumentDialog(
-                title: 'Privacy Policy',
-                content: _privacyText,
+                document: _privacyDocument,
               ),
             );
           },
@@ -194,6 +195,8 @@ class _ZeronHomeScreenState extends State<ZeronHomeScreen>
 
   String _buildAccountInfoText() {
     return '''
+Account Information
+
 Username
 ${_username.isEmpty ? 'Not registered' : _username}
 
@@ -205,6 +208,22 @@ ${_country.isEmpty ? 'Not registered' : _country}
 
 Region
 ${_region.isEmpty ? 'Not registered' : _region}
+
+----
+
+アカウント情報
+
+ユーザー名
+${_username.isEmpty ? '未登録' : _username}
+
+メールアドレス
+${_email.isEmpty ? '未登録' : _email}
+
+国
+${_country.isEmpty ? '未登録' : _country}
+
+地域
+${_region.isEmpty ? '未登録' : _region}
 ''';
   }
 
@@ -231,7 +250,7 @@ ${_region.isEmpty ? 'Not registered' : _region}
   }
 }
 
-class _OpeningScene extends StatelessWidget {
+class _OpeningScene extends StatefulWidget {
   const _OpeningScene({
     super.key,
     required this.controller,
@@ -244,11 +263,33 @@ class _OpeningScene extends StatelessWidget {
   final Future<void> Function() onOpenSettings;
 
   @override
+  State<_OpeningScene> createState() => _OpeningSceneState();
+}
+
+class _OpeningSceneState extends State<_OpeningScene> {
+  Offset _pointerPosition = const Offset(0, 0);
+  bool _isPointerInside = false;
+
+  void _setPointer(Offset value) {
+    setState(() {
+      _pointerPosition = value;
+      _isPointerInside = true;
+    });
+  }
+
+  void _clearPointer() {
+    setState(() {
+      _pointerPosition = const Offset(0, 0);
+      _isPointerInside = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: widget.controller,
       builder: (context, _) {
-        final double t = controller.value;
+        final double t = widget.controller.value;
         final double presenceSeconds = t * 6.0 + 0.15;
         final double backgroundOpacity =
             Curves.easeOutCubic.transform((t / 0.42).clamp(0.0, 1.0));
@@ -262,142 +303,156 @@ class _OpeningScene extends StatelessWidget {
             Curves.easeOutCubic.transform(((t - 0.62) / 0.20).clamp(0.0, 1.0));
         final double drift = math.sin(presenceSeconds * 0.55) * 8.0;
 
-        return GestureDetector(
+        final double openingEnergy = (0.12 + (t * 0.18)).clamp(0.10, 0.42);
+
+        return Listener(
           behavior: HitTestBehavior.opaque,
-          onTap: () async {
-            await onPrimaryTap();
-          },
-          child: ColoredBox(
-            color: Colors.black,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                ZeronNoise(
-                  presenceSeconds: presenceSeconds,
-                  ambientStage: 2,
-                  interactionEnergy: 0.08 + (t * 0.12),
-                  isPointerInside: false,
-                ),
-                Opacity(
-                  opacity: backgroundOpacity,
-                  child: ZeronBackground(
+          onPointerHover: (event) => _setPointer(event.localPosition),
+          onPointerDown: (event) => _setPointer(event.localPosition),
+          onPointerMove: (event) => _setPointer(event.localPosition),
+          onPointerUp: (_) => _clearPointer(),
+          onPointerCancel: (_) => _clearPointer(),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () async {
+              await widget.onPrimaryTap();
+            },
+            onPanStart: (details) => _setPointer(details.localPosition),
+            onPanUpdate: (details) => _setPointer(details.localPosition),
+            onPanEnd: (_) => _clearPointer(),
+            onPanCancel: _clearPointer,
+            child: ColoredBox(
+              color: Colors.black,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ZeronNoise(
                     presenceSeconds: presenceSeconds,
                     ambientStage: 2,
-                    interactionEnergy: 0.10 + (t * 0.12),
-                    pointerPosition: const Offset(0, 0),
+                    interactionEnergy: openingEnergy,
+                    isPointerInside: _isPointerInside,
                   ),
-                ),
-                Opacity(
-                  opacity: glowOpacity,
-                  child: ZeronDistortion(
-                    presenceSeconds: presenceSeconds,
-                    ambientStage: 2,
-                    interactionEnergy: 0.12 + (t * 0.18),
-                    pointerPosition: const Offset(0, 0),
-                  ),
-                ),
-                Opacity(
-                  opacity: glowOpacity,
-                  child: ZeronGlow(
-                    presenceSeconds: presenceSeconds,
-                    ambientStage: 2,
-                    interactionEnergy: 0.10 + (t * 0.12),
-                    pointerPosition: const Offset(0, 0),
-                    memoryPresence: 0.08,
-                    memoryType: 'still',
-                  ),
-                ),
-                Center(
-                  child: Transform.translate(
-                    offset: Offset(0, drift),
-                    child: Opacity(
-                      opacity: logoOpacity,
-                      child: const ZeronLogo(isIdle: false),
+                  Opacity(
+                    opacity: backgroundOpacity,
+                    child: ZeronBackground(
+                      presenceSeconds: presenceSeconds,
+                      ambientStage: 2,
+                      interactionEnergy: openingEnergy,
+                      pointerPosition: _pointerPosition,
                     ),
                   ),
-                ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 24,
+                  Opacity(
+                    opacity: glowOpacity,
+                    child: ZeronDistortion(
+                      presenceSeconds: presenceSeconds,
+                      ambientStage: 2,
+                      interactionEnergy: openingEnergy,
+                      pointerPosition: _pointerPosition,
                     ),
-                    child: Column(
-                      children: [
-                        const Spacer(),
-                        Opacity(
-                          opacity: infoOpacity,
-                          child: const Column(
-                            children: [
-                              Text(
-                                'Version 1.0.0',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                  letterSpacing: 0.8,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        Opacity(
-                          opacity: footerOpacity,
-                          child: Column(
-                            children: [
-                              const Text(
-                                'WALK FOR EARTH',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Color(0xFFDEFBEA),
-                                  fontSize: 11,
-                                  letterSpacing: 3.6,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                'Global decarbonization participation interface',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.70),
-                                  fontSize: 12,
-                                  height: 1.45,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                              const SizedBox(height: 26),
-                              GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () async {
-                                  await onOpenSettings();
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 8,
+                  ),
+                  Opacity(
+                    opacity: glowOpacity,
+                    child: ZeronGlow(
+                      presenceSeconds: presenceSeconds,
+                      ambientStage: 2,
+                      interactionEnergy: openingEnergy,
+                      pointerPosition: _pointerPosition,
+                      memoryPresence: 0.08,
+                      memoryType: _isPointerInside ? 'active' : 'still',
+                    ),
+                  ),
+                  Center(
+                    child: Transform.translate(
+                      offset: Offset(0, drift),
+                      child: Opacity(
+                        opacity: logoOpacity,
+                        child: const ZeronLogo(isIdle: false),
+                      ),
+                    ),
+                  ),
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 24,
+                      ),
+                      child: Column(
+                        children: [
+                          const Spacer(),
+                          Opacity(
+                            opacity: infoOpacity,
+                            child: const Column(
+                              children: [
+                                Text(
+                                  'Version 1.0.0',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    letterSpacing: 0.8,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  child: Text(
-                                    'Setting / 設定',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.92),
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w500,
-                                      letterSpacing: 0.3,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Spacer(),
+                          Opacity(
+                            opacity: footerOpacity,
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'WALK FOR EARTH',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFFDEFBEA),
+                                    fontSize: 11,
+                                    letterSpacing: 3.6,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Global decarbonization participation interface',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.70),
+                                    fontSize: 12,
+                                    height: 1.45,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 26),
+                                GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: () async {
+                                    await widget.onOpenSettings();
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
+                                    child: Text(
+                                      'Settings / 設定',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.92),
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: 0.3,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -650,7 +705,7 @@ class _OpeningSettingsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             const Text(
-              'Setting',
+              'Settings / 設定',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 22,
@@ -659,23 +714,23 @@ class _OpeningSettingsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             _SettingsRow(
-              label: 'Account information',
-              value: username.isEmpty ? 'Not registered' : username,
+              label: 'Account Information / アカウント情報',
+              value: username.isEmpty ? 'Not registered / 未登録' : username,
               onTap: onOpenAccountInfo,
             ),
             const SizedBox(height: 10),
             _SettingsRow(
-              label: 'Specified Commercial Transaction Act',
+              label: 'Specified Commercial Transactions Act / 特定商取引法表記',
               onTap: onOpenCommercialLaw,
             ),
             const SizedBox(height: 10),
             _SettingsRow(
-              label: 'Terms of Service',
+              label: 'Terms of Service / 利用規約',
               onTap: onOpenTerms,
             ),
             const SizedBox(height: 10),
             _SettingsRow(
-              label: 'Privacy Policy',
+              label: 'Privacy Policy / プライバシーポリシー',
               onTap: onOpenPrivacy,
             ),
             const SizedBox(height: 10),
@@ -771,17 +826,50 @@ class _SettingsRow extends StatelessWidget {
   }
 }
 
-class _InfoDocumentDialog extends StatelessWidget {
-  const _InfoDocumentDialog({
-    required this.title,
-    required this.content,
+class _LocalizedDocument {
+  const _LocalizedDocument({
+    required this.titleEn,
+    required this.titleJa,
+    required this.bodyEn,
+    required this.bodyJa,
   });
 
-  final String title;
-  final String content;
+  final String titleEn;
+  final String titleJa;
+  final String bodyEn;
+  final String bodyJa;
+}
+
+class _InfoDocumentDialog extends StatefulWidget {
+  const _InfoDocumentDialog({
+    required this.document,
+    this.initialLanguage = 'en',
+  });
+
+  final _LocalizedDocument document;
+  final String initialLanguage;
+
+  @override
+  State<_InfoDocumentDialog> createState() => _InfoDocumentDialogState();
+}
+
+class _InfoDocumentDialogState extends State<_InfoDocumentDialog> {
+  late String _language;
+
+  @override
+  void initState() {
+    super.initState();
+    _language = widget.initialLanguage;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bool isJa = _language == 'ja';
+    final String title =
+        isJa ? widget.document.titleJa : widget.document.titleEn;
+    final String content =
+        isJa ? widget.document.bodyJa : widget.document.bodyEn;
+
     return Dialog(
       backgroundColor: const Color(0xFF091015),
       shape: RoundedRectangleBorder(
@@ -795,13 +883,52 @@ class _InfoDocumentDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w700,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.08),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _MiniLangButton(
+                          label: 'EN',
+                          selected: _language == 'en',
+                          onTap: () {
+                            setState(() {
+                              _language = 'en';
+                            });
+                          },
+                        ),
+                        _MiniLangButton(
+                          label: 'JP',
+                          selected: _language == 'ja',
+                          onTap: () {
+                            setState(() {
+                              _language = 'ja';
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               ConstrainedBox(
@@ -832,9 +959,9 @@ class _InfoDocumentDialog extends StatelessWidget {
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
-                  child: const Text(
-                    'Close',
-                    style: TextStyle(
+                  child: Text(
+                    isJa ? '閉じる' : 'Close',
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
@@ -849,7 +976,50 @@ class _InfoDocumentDialog extends StatelessWidget {
   }
 }
 
-const String _commercialLawText = '''
+class _MiniLangButton extends StatelessWidget {
+  const _MiniLangButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFB8FFE3).withOpacity(0.14)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected
+                ? const Color(0xFFEFFFF8)
+                : Colors.white.withOpacity(0.62),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+const _LocalizedDocument _commercialLawDocument = _LocalizedDocument(
+  titleEn: 'Specified Commercial Transactions Act',
+  titleJa: '特定商取引法表記',
+  bodyEn: '''
 Seller
 ZERON TOKYO
 
@@ -879,9 +1049,44 @@ Due to the nature of digital services, completed payments are generally non-refu
 
 Operating Environment
 A supported smartphone, operating system, and internet connection are required.
-''';
+''',
+  bodyJa: '''
+販売事業者
+ZERON TOKYO
 
-const String _termsText = '''
+代表者
+Hiroyuki Sugiura
+
+連絡先メールアドレス
+support@zeron.tokyo
+
+販売価格
+各購入ページまたはサブスクリプションページに表示します。
+
+追加費用
+インターネット接続料金、通信料金はユーザー負担です。
+
+支払時期
+購入またはサブスクリプション確定時に課金されます。
+
+提供時期
+特段の定めがない限り、決済確認後ただちに利用可能になります。
+
+解約
+継続課金の解約は、次回請求日前までにプラットフォーム設定から行えます。
+
+返金
+デジタルサービスの性質上、法令上必要な場合を除き、決済完了後の返金は原則行いません。
+
+動作環境
+対応するスマートフォン、OS、インターネット接続が必要です。
+''',
+);
+
+const _LocalizedDocument _termsDocument = _LocalizedDocument(
+  titleEn: 'Terms of Service',
+  titleJa: '利用規約',
+  bodyEn: '''
 These Terms of Service govern access to ZERON and related participation features.
 
 1. Users may create an account and participate in walking-based environmental initiatives.
@@ -890,9 +1095,23 @@ These Terms of Service govern access to ZERON and related participation features
 4. Future rewards, campaigns, and sponsor programs may have additional rules.
 5. ZERON may update features, policies, and service details to improve platform operations.
 6. Continued use of the service constitutes agreement to the latest terms.
-''';
+''',
+  bodyJa: '''
+本利用規約は、ZERONおよび関連する参加機能へのアクセスと利用条件を定めるものです。
 
-const String _privacyText = '''
+1. ユーザーはアカウントを作成し、歩行ベースの環境参加施策に参加できます。
+2. ユーザーは正確な登録情報を提供しなければなりません。
+3. 不正な歩数操作、なりすまし、システム悪用が確認された場合、利用停止となることがあります。
+4. 将来の報酬、キャンペーン、スポンサー施策には追加ルールが適用される場合があります。
+5. ZERONはサービス改善のため、機能・方針・提供内容を更新する場合があります。
+6. 継続利用した場合、最新の利用規約に同意したものとみなします。
+''',
+);
+
+const _LocalizedDocument _privacyDocument = _LocalizedDocument(
+  titleEn: 'Privacy Policy',
+  titleJa: 'プライバシーポリシー',
+  bodyEn: '''
 ZERON collects limited account and participation data to operate rankings, community participation, and future environmental reward features.
 
 Collected Information
@@ -915,9 +1134,37 @@ ZERON does not sell personal information. Data may be shared only when required 
 
 User Rights
 Users may request correction or deletion of stored personal information subject to applicable law and operational requirements.
-''';
+''',
+  bodyJa: '''
+ZERONは、ランキング、地域参加、将来の環境報酬機能を運営するために、必要最小限のアカウント情報および参加データを取得します。
 
-const String _antiCheatText = '''
+取得する情報
+- ユーザー名
+- メールアドレス
+- 国
+- 地域
+- 歩行参加データ
+- サービス安定運用に必要な端末情報およびアプリ利用データ
+
+利用目的
+- アカウント作成および管理
+- ランキング・地域参加機能の提供
+- 不正防止
+- サービス改善
+- 将来のキャンペーンおよび報酬運営
+
+第三者提供
+ZERONは個人情報を販売しません。法令に基づく場合、または信頼できるインフラ提供パートナーを通じたサービス提供に必要な場合に限り共有されることがあります。
+
+ユーザーの権利
+ユーザーは、法令および運用上の要件に従い、保存された個人情報の訂正または削除を請求できます。
+''',
+);
+
+const _LocalizedDocument _antiCheatDocument = _LocalizedDocument(
+  titleEn: 'Anti-Cheat Policy',
+  titleJa: '不正防止ポリシー',
+  bodyEn: '''
 ZERON uses participation integrity rules to protect rankings, sponsor-linked rewards, and environmental credibility.
 
 Prohibited Conduct
@@ -934,7 +1181,26 @@ Participation records, device metadata, behavioral patterns, and anomaly signals
 
 Appeals
 Users may contact support for a review if they believe an enforcement action was applied incorrectly.
-''';
+''',
+  bodyJa: '''
+ZERONは、ランキング、スポンサー連動報酬、環境貢献の信頼性を守るため、不正防止ルールを適用します。
+
+禁止行為
+- spoofing、自動化、エミュレータ動作、非認可デバイスなどによる歩数の水増し
+- 複数アカウントを用いたランキング操作
+- アプリ挙動、API、ローカル保存、計測ロジックの改ざん
+- ランキング、キャンペーン、報酬を歪める目的の不正参加全般
+
+対応
+ZERONは不審な挙動を調査し、スコア無効化、利用制限、停止、永久削除を含む措置を行う場合があります。
+
+確認対象
+公平性維持のため、参加記録、端末メタデータ、行動パターン、異常シグナルを確認する場合があります。
+
+異議申立て
+誤った対応だと考える場合、ユーザーはサポートへ審査を申請できます。
+''',
+);
 
 class _ZeronMainShell extends StatefulWidget {
   const _ZeronMainShell({super.key});
@@ -1083,16 +1349,19 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     final liveSummary = StepService.buildSummary(liveTodaySteps);
 
     final totalSteps = persistedDate == todayKey
-        ? (persistedTotalSteps - liveTodaySteps).clamp(0, 1 << 30) + liveTodaySteps
+        ? (persistedTotalSteps - liveTodaySteps).clamp(0, 1 << 30) +
+            liveTodaySteps
         : persistedTotalSteps;
 
     final totalCo2 = persistedDate == todayKey
-        ? (persistedTotalCo2 - liveSummary.totalCo2KgSaved).clamp(0.0, double.infinity) +
+        ? (persistedTotalCo2 - liveSummary.totalCo2KgSaved)
+                .clamp(0.0, double.infinity) +
             liveSummary.totalCo2KgSaved
         : persistedTotalCo2;
 
     final totalPoints = persistedDate == todayKey
-        ? (persistedTotalPoints - liveSummary.totalPrimePoints).clamp(0, 1 << 30) +
+        ? (persistedTotalPoints - liveSummary.totalPrimePoints)
+                .clamp(0, 1 << 30) +
             liveSummary.totalPrimePoints
         : persistedTotalPoints;
 
@@ -1249,7 +1518,8 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       final previousTodayPoints = _user.todayPrimePoints;
 
       final totalSteps =
-          (_user.totalSteps - previousTodaySteps).clamp(0, 1 << 30) + summary.totalSteps;
+          (_user.totalSteps - previousTodaySteps).clamp(0, 1 << 30) +
+              summary.totalSteps;
       final totalCo2 =
           (_user.totalCo2KgSaved - previousTodayCo2).clamp(0.0, double.infinity) +
               summary.totalCo2KgSaved;
@@ -1349,7 +1619,8 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         rank: 1,
         name: _user.displayName ?? 'You',
         value: todayCo2Grams,
-        label: '${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
+        label:
+            '${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
         isCurrentUser: true,
         relatedUserId: _user.id,
       ),
@@ -1362,7 +1633,8 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         rank: 1,
         name: _user.displayName ?? 'You',
         value: todayCo2Grams,
-        label: '${_user.countryName} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
+        label:
+            '${_user.countryName} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
         isCurrentUser: true,
         relatedUserId: _user.id,
       ),
@@ -1375,7 +1647,8 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
         rank: 1,
         name: _user.displayName ?? 'You',
         value: todayCo2Grams,
-        label: '${_user.city} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
+        label:
+            '${_user.city} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
         isCurrentUser: true,
         relatedUserId: _user.id,
       ),
@@ -1415,7 +1688,8 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       totalStepsToday: _user.todaySteps,
       totalStepsThisMonth: totalTeamSteps == 0 ? _user.totalSteps : totalTeamSteps,
       totalCo2KgSaved: totalTeamCo2 == 0 ? _user.totalCo2KgSaved : totalTeamCo2,
-      totalPrimePoints: totalTeamPoints == 0 ? _user.totalPrimePoints : totalTeamPoints,
+      totalPrimePoints:
+          totalTeamPoints == 0 ? _user.totalPrimePoints : totalTeamPoints,
       rewardPoolYen: totalMembers * 100,
       updatedAt: DateTime.now(),
     );
@@ -1461,8 +1735,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     await showDialog<void>(
       context: context,
       builder: (_) => const _InfoDocumentDialog(
-        title: 'Terms of Service',
-        content: _termsText,
+        document: _termsDocument,
       ),
     );
   }
@@ -1471,8 +1744,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     await showDialog<void>(
       context: context,
       builder: (_) => const _InfoDocumentDialog(
-        title: 'Privacy Policy',
-        content: _privacyText,
+        document: _privacyDocument,
       ),
     );
   }
@@ -1481,8 +1753,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     await showDialog<void>(
       context: context,
       builder: (_) => const _InfoDocumentDialog(
-        title: 'Specified Commercial Transaction Act',
-        content: _commercialLawText,
+        document: _commercialLawDocument,
       ),
     );
   }
@@ -1491,8 +1762,7 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     await showDialog<void>(
       context: context,
       builder: (_) => const _InfoDocumentDialog(
-        title: 'Anti-Cheat Policy',
-        content: _antiCheatText,
+        document: _antiCheatDocument,
       ),
     );
   }
@@ -1550,101 +1820,168 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
       ),
     ];
 
-    return MouseRegion(
-      onEnter: (_) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerHover: (event) {
         setState(() {
           _isPointerInside = true;
+          _pointerPosition = event.localPosition;
+          _interactionEnergy = (_interactionEnergy + 0.02).clamp(0.08, 0.60);
         });
       },
-      onExit: (_) {
+      onPointerDown: (event) {
+        setState(() {
+          _isPointerInside = true;
+          _pointerPosition = event.localPosition;
+          _interactionEnergy = (_interactionEnergy + 0.05).clamp(0.10, 0.68);
+        });
+      },
+      onPointerMove: (event) {
+        setState(() {
+          _isPointerInside = true;
+          _pointerPosition = event.localPosition;
+          _interactionEnergy = (_interactionEnergy + 0.03).clamp(0.10, 0.68);
+        });
+      },
+      onPointerUp: (_) {
         setState(() {
           _isPointerInside = false;
           _pointerPosition = const Offset(0, 0);
         });
       },
-      onHover: (event) {
+      onPointerCancel: (_) {
         setState(() {
-          _pointerPosition = event.localPosition;
-          _interactionEnergy = (_interactionEnergy + 0.02).clamp(0.08, 0.60);
+          _isPointerInside = false;
+          _pointerPosition = const Offset(0, 0);
         });
       },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            IgnorePointer(
-              child: ZeronNoise(
-                presenceSeconds: _presenceSeconds,
-                ambientStage: 2,
-                interactionEnergy: _interactionEnergy,
-                isPointerInside: _isPointerInside,
-              ),
-            ),
-            IgnorePointer(
-              child: ZeronBackground(
-                presenceSeconds: _presenceSeconds,
-                ambientStage: 2,
-                interactionEnergy: _interactionEnergy,
-                pointerPosition: _pointerPosition,
-              ),
-            ),
-            IgnorePointer(
-              child: ZeronDistortion(
-                presenceSeconds: _presenceSeconds,
-                ambientStage: 2,
-                interactionEnergy: _interactionEnergy,
-                pointerPosition: _pointerPosition,
-              ),
-            ),
-            IgnorePointer(
-              child: ZeronGlow(
-                presenceSeconds: _presenceSeconds,
-                ambientStage: 2,
-                interactionEnergy: _interactionEnergy,
-                pointerPosition: _pointerPosition,
-                memoryPresence: 0.10,
-                memoryType: _isPointerInside ? 'active' : 'still',
-              ),
-            ),
-            IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF020406).withOpacity(0.60),
-                      const Color(0xFF040A0E).withOpacity(0.52),
-                      const Color(0xFF010203).withOpacity(0.78),
-                    ],
+      child: MouseRegion(
+        onEnter: (_) {
+          setState(() {
+            _isPointerInside = true;
+          });
+        },
+        onExit: (_) {
+          setState(() {
+            _isPointerInside = false;
+            _pointerPosition = const Offset(0, 0);
+          });
+        },
+        onHover: (event) {
+          setState(() {
+            _pointerPosition = event.localPosition;
+            _interactionEnergy = (_interactionEnergy + 0.02).clamp(0.08, 0.60);
+          });
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: (details) {
+            setState(() {
+              _isPointerInside = true;
+              _pointerPosition = details.localPosition;
+              _interactionEnergy =
+                  (_interactionEnergy + 0.04).clamp(0.10, 0.68);
+            });
+          },
+          onPanUpdate: (details) {
+            setState(() {
+              _isPointerInside = true;
+              _pointerPosition = details.localPosition;
+              _interactionEnergy =
+                  (_interactionEnergy + 0.03).clamp(0.10, 0.68);
+            });
+          },
+          onPanEnd: (_) {
+            setState(() {
+              _isPointerInside = false;
+              _pointerPosition = const Offset(0, 0);
+            });
+          },
+          onPanCancel: () {
+            setState(() {
+              _isPointerInside = false;
+              _pointerPosition = const Offset(0, 0);
+            });
+          },
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Stack(
+              fit: StackFit.expand,
+              children: [
+                IgnorePointer(
+                  child: ZeronNoise(
+                    presenceSeconds: _presenceSeconds,
+                    ambientStage: 2,
+                    interactionEnergy: _interactionEnergy,
+                    isPointerInside: _isPointerInside,
                   ),
                 ),
-              ),
-            ),
-            Column(
-              children: [
-                Expanded(
-                  child: SafeArea(
-                    bottom: false,
-                    child: IndexedStack(
-                      index: _currentIndex,
-                      children: pages,
+                IgnorePointer(
+                  child: ZeronBackground(
+                    presenceSeconds: _presenceSeconds,
+                    ambientStage: 2,
+                    interactionEnergy: _interactionEnergy,
+                    pointerPosition: _pointerPosition,
+                  ),
+                ),
+                IgnorePointer(
+                  child: ZeronDistortion(
+                    presenceSeconds: _presenceSeconds,
+                    ambientStage: 2,
+                    interactionEnergy: _interactionEnergy,
+                    pointerPosition: _pointerPosition,
+                  ),
+                ),
+                IgnorePointer(
+                  child: ZeronGlow(
+                    presenceSeconds: _presenceSeconds,
+                    ambientStage: 2,
+                    interactionEnergy: _interactionEnergy,
+                    pointerPosition: _pointerPosition,
+                    memoryPresence: 0.10,
+                    memoryType: _isPointerInside ? 'active' : 'still',
+                  ),
+                ),
+                IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          const Color(0xFF020406).withOpacity(0.60),
+                          const Color(0xFF040A0E).withOpacity(0.52),
+                          const Color(0xFF010203).withOpacity(0.78),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                _BottomBar(
-                  index: _currentIndex,
-                  labelBuilder: _navLabel,
-                  onChanged: (index) {
-                    setState(() {
-                      _currentIndex = index;
-                    });
-                  },
+                Column(
+                  children: [
+                    Expanded(
+                      child: SafeArea(
+                        bottom: false,
+                        child: IndexedStack(
+                          index: _currentIndex,
+                          children: pages,
+                        ),
+                      ),
+                    ),
+                    _BottomBar(
+                      index: _currentIndex,
+                      labelBuilder: _navLabel,
+                      onChanged: (index) {
+                        setState(() {
+                          _currentIndex = index;
+                        });
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -1867,7 +2204,8 @@ class _DashboardPage extends StatelessWidget {
               const SizedBox(height: 10),
               _SignalRow(
                 label: t('CO₂ Reduction', 'CO₂削減量'),
-                value: '${(data.todaySummary.totalCo2KgSaved * 7).toStringAsFixed(2)} kg',
+                value:
+                    '${(data.todaySummary.totalCo2KgSaved * 7).toStringAsFixed(2)} kg',
               ),
               const SizedBox(height: 10),
               _SignalRow(
@@ -2068,10 +2406,9 @@ class _TeamPage extends StatelessWidget {
               kind: TeamKind.team,
               ownerUserId: data.user.id,
               memberCount: 1,
-              totalSteps: entry.value,
-              totalCo2KgSaved:
-                  ZeronImpactCalculator.calculateCo2KgSavedFromSteps(entry.value),
-              totalPrimePoints: (entry.value ~/ 100),
+              totalSteps: 0,
+              totalCo2KgSaved: entry.value / 1000,
+              totalPrimePoints: ((entry.value / 1000) * 100).round(),
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
               description: 'Saved local team',
@@ -2130,7 +2467,9 @@ class _TeamPage extends StatelessWidget {
           (index) {
             final team = visibleTeams[index];
             return Padding(
-              padding: EdgeInsets.only(bottom: index == visibleTeams.length - 1 ? 0 : 12),
+              padding: EdgeInsets.only(
+                bottom: index == visibleTeams.length - 1 ? 0 : 12,
+              ),
               child: _TeamCard(
                 team: team,
                 isPrimary: team.id == data.primaryTeam.id,
@@ -3071,13 +3410,13 @@ class _RankTile extends StatelessWidget {
               style: TextStyle(
                 color: highlighted
                     ? const Color(0xFFEFFFF8)
-                    : Colors.white.withOpacity(0.82),
+                    : Colors.white.withOpacity(0.86),
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -3086,21 +3425,23 @@ class _RankTile extends StatelessWidget {
                   name,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   badge,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.58),
-                    fontSize: 11.5,
+                    color: Colors.white.withOpacity(0.62),
+                    fontSize: 12,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 12),
           Text(
             value,
             style: const TextStyle(
@@ -3126,19 +3467,14 @@ class _TeamCard extends StatelessWidget {
   final bool isPrimary;
   final String Function(String en, String ja) t;
 
-  String _kindLabel() {
-    switch (team.kind) {
-      case TeamKind.friends:
-        return t('Friends', 'フレンズ');
-      case TeamKind.team:
-        return t('Team', 'チーム');
-      case TeamKind.company:
-        return t('Company', 'カンパニー');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final kindLabel = switch (team.kind) {
+      TeamKind.friends => t('Friends', 'フレンズ'),
+      TeamKind.team => t('Team', 'チーム'),
+      TeamKind.company => t('Company', 'カンパニー'),
+    };
+
     return Container(
       decoration: _panelDecoration(highlighted: isPrimary),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -3148,86 +3484,150 @@ class _TeamCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFB8FFE3).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: const Color(0xFFB8FFE3).withOpacity(0.18),
-                  ),
+                  shape: BoxShape.circle,
+                  color: isPrimary
+                      ? const Color(0xFFB8FFE3).withOpacity(0.16)
+                      : Colors.white.withOpacity(0.06),
                 ),
-                child: Text(
-                  _kindLabel(),
-                  style: const TextStyle(
-                    color: Color(0xFFEFFFF8),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Icon(
+                  team.kind == TeamKind.company
+                      ? Icons.apartment_rounded
+                      : Icons.groups_rounded,
+                  color: isPrimary
+                      ? const Color(0xFFB8FFE3)
+                      : Colors.white.withOpacity(0.78),
                 ),
               ),
-              const Spacer(),
-              Text(
-                isPrimary ? t('Primary', 'メイン') : t('Active', '稼働中'),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.62),
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      team.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      kindLabel,
+                      style: TextStyle(
+                        color: const Color(0xFFB8FFE3).withOpacity(0.92),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              if (isPrimary)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFB8FFE3).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: const Color(0xFFB8FFE3).withOpacity(0.20),
+                    ),
+                  ),
+                  child: Text(
+                    t('PRIMARY', 'メイン'),
+                    style: const TextStyle(
+                      color: Color(0xFFEFFFF8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if ((team.description ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              team.description!.trim(),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.72),
+                fontSize: 12.5,
+                height: 1.5,
+              ),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _MiniStatChip(
+                label: t('Members', 'メンバー'),
+                value: _formatNumber(team.memberCount),
+              ),
+              _MiniStatChip(
+                label: t('Steps', '歩数'),
+                value: _formatNumber(team.totalSteps),
+              ),
+              _MiniStatChip(
+                label: t('CO₂', 'CO₂'),
+                value: '${team.totalCo2KgSaved.toStringAsFixed(2)} kg',
+              ),
+              _MiniStatChip(
+                label: t('Points', 'ポイント'),
+                value: _formatNumber(team.totalPrimePoints),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStatChip extends StatelessWidget {
+  const _MiniStatChip({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            team.name,
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.58),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 18,
+              fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            team.description ?? '',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.68),
-              fontSize: 12.5,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _TinyMetric(
-                  label: t('Members', '人数'),
-                  value: _formatNumber(team.memberCount),
-                ),
-              ),
-              Expanded(
-                child: _TinyMetric(
-                  label: t('CO₂ Saved', 'CO₂削減'),
-                  value: '${team.totalCo2KgSaved.toStringAsFixed(1)} kg',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _TinyMetric(
-                  label: t('Points', 'ポイント'),
-                  value: _formatNumber(team.totalPrimePoints),
-                ),
-              ),
-              Expanded(
-                child: _TinyMetric(
-                  label: t('Steps', '歩数'),
-                  value: _formatNumber(team.totalSteps),
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -3244,114 +3644,311 @@ class _CreateTeamCard extends StatelessWidget {
   final String Function(String en, String ja) t;
   final Future<void> Function(_TeamDraft draft) onCreateTeam;
 
+  Future<void> _showCreateDialog(BuildContext context) async {
+    final result = await showDialog<_TeamDraft>(
+      context: context,
+      builder: (_) => _CreateTeamDialog(t: t),
+    );
+
+    if (result == null) return;
+    await onCreateTeam(result);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () async {
-        final draft = await showDialog<_TeamDraft>(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => _CreateTeamDialog(t: t),
-        );
-
-        if (draft == null) return;
-        await onCreateTeam(draft);
-      },
-      child: Container(
-        decoration: _panelDecoration(),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFB8FFE3).withOpacity(0.10),
+    return Container(
+      decoration: _panelDecoration(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            t('Create Team', 'チームを作成'),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            t(
+              'Build a local team, friend circle, or future company group for impact and carbon-credit expansion.',
+              'ローカルチーム、友人グループ、将来の法人グループを作成し、環境貢献とカーボンクレジット導線に接続します。',
+            ),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.72),
+              fontSize: 13,
+              height: 1.55,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB8FFE3).withOpacity(0.14),
+                foregroundColor: const Color(0xFFEFFFF8),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: const Color(0xFFB8FFE3).withOpacity(0.22),
+                  ),
+                ),
               ),
-              child: const Icon(
-                Icons.add_rounded,
-                color: Color(0xFFB8FFE3),
+              onPressed: () async => _showCreateDialog(context),
+              child: Text(
+                t('Create New Team', '新しいチームを作成'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    t('Create Team', 'チームを作成'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CreateTeamDialog extends StatefulWidget {
+  const _CreateTeamDialog({
+    required this.t,
+  });
+
+  final String Function(String en, String ja) t;
+
+  @override
+  State<_CreateTeamDialog> createState() => _CreateTeamDialogState();
+}
+
+class _CreateTeamDialogState extends State<_CreateTeamDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
+
+  TeamKind _kind = TeamKind.team;
+  bool _makePrimary = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _descriptionController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _nameController.text.trim();
+    final description = _descriptionController.text.trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.t(
+            'Please enter a team name.',
+            'チーム名を入力してください。',
+          )),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(
+      _TeamDraft(
+        name: name,
+        description: description.isEmpty ? null : description,
+        kind: _kind,
+        makePrimary: _makePrimary,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF091015),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.t('Create Team', 'チームを作成'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _FormField(
+                controller: _nameController,
+                label: widget.t('Team name', 'チーム名'),
+              ),
+              const SizedBox(height: 12),
+              _FormField(
+                controller: _descriptionController,
+                label: widget.t('Description', '説明'),
+              ),
+              const SizedBox(height: 14),
+              _KindSelector(
+                selected: _kind,
+                t: widget.t,
+                onChanged: (value) {
+                  setState(() {
+                    _kind = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 14),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                ),
+                child: CheckboxListTile(
+                  value: _makePrimary,
+                  activeColor: const Color(0xFFB8FFE3),
+                  checkColor: Colors.black,
+                  side: BorderSide(color: Colors.white.withOpacity(0.20)),
+                  title: Text(
+                    widget.t(
+                      'Make this my primary team',
+                      'このチームをメインチームにする',
+                    ),
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    t(
-                      'Build a new participation unit for friends, team or company.',
-                      'フレンド、チーム、会社単位で新しい参加ユニットを作成します。',
+                  subtitle: Text(
+                    widget.t(
+                      'Your live steps and CO₂ totals will attach to this team.',
+                      'ライブ歩数とCO₂累計をこのチームに紐付けます。',
                     ),
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.64),
-                      fontSize: 12.5,
-                      height: 1.45,
+                      fontSize: 12,
                     ),
                   ),
-                ],
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _makePrimary = value ?? false;
+                    });
+                  },
+                ),
               ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Colors.white.withOpacity(0.60),
-            ),
-          ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB8FFE3).withOpacity(0.14),
+                    foregroundColor: const Color(0xFFEFFFF8),
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: const Color(0xFFB8FFE3).withOpacity(0.22),
+                      ),
+                    ),
+                  ),
+                  onPressed: _submit,
+                  child: Text(
+                    widget.t('Create', '作成'),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _TinyMetric extends StatelessWidget {
-  const _TinyMetric({
-    required this.label,
-    required this.value,
+class _KindSelector extends StatelessWidget {
+  const _KindSelector({
+    required this.selected,
+    required this.t,
+    required this.onChanged,
   });
 
-  final String label;
-  final String value;
+  final TeamKind selected;
+  final String Function(String en, String ja) t;
+  final ValueChanged<TeamKind> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final items = <({TeamKind kind, String label})>[
+      (kind: TeamKind.friends, label: t('Friends', 'フレンズ')),
+      (kind: TeamKind.team, label: t('Team', 'チーム')),
+      (kind: TeamKind.company, label: t('Company', 'カンパニー')),
+    ];
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      margin: const EdgeInsets.only(right: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.58),
-              fontSize: 11.5,
+      decoration: _panelDecoration(),
+      padding: const EdgeInsets.all(6),
+      child: Row(
+        children: items.map((item) {
+          final isSelected = selected == item.kind;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(item.kind),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFFB8FFE3).withOpacity(0.13)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: isSelected
+                        ? const Color(0xFFB8FFE3).withOpacity(0.24)
+                        : Colors.transparent,
+                  ),
+                ),
+                child: Text(
+                  item.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isSelected
+                        ? const Color(0xFFEFFFF8)
+                        : Colors.white.withOpacity(0.60),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -3370,25 +3967,21 @@ class _AccountRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        SizedBox(
-          width: 78,
+        Expanded(
           child: Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.58),
+              color: Colors.white.withOpacity(0.66),
               fontSize: 13,
             ),
           ),
         ),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-            ),
+        Text(
+          value.isEmpty ? '-' : value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],
@@ -3409,29 +4002,24 @@ class _SimpleArrowRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () async {
-        await onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
-                ),
+      onTap: () async => onTap(),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Colors.white.withOpacity(0.60),
-            ),
-          ],
-        ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: Colors.white.withOpacity(0.62),
+          ),
+        ],
       ),
     );
   }
@@ -3451,18 +4039,18 @@ class _LanguageSelector extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _LanguageButton(
+          child: _LangPill(
             label: 'English',
             selected: selected == 'en',
-            onTap: () => onChanged('en'),
+            onTap: () async => onChanged('en'),
           ),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: _LanguageButton(
+          child: _LangPill(
             label: '日本語',
             selected: selected == 'ja',
-            onTap: () => onChanged('ja'),
+            onTap: () async => onChanged('ja'),
           ),
         ),
       ],
@@ -3470,8 +4058,8 @@ class _LanguageSelector extends StatelessWidget {
   }
 }
 
-class _LanguageButton extends StatelessWidget {
-  const _LanguageButton({
+class _LangPill extends StatelessWidget {
+  const _LangPill({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -3484,21 +4072,19 @@ class _LanguageButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () async {
-        await onTap();
-      },
+      onTap: () async => onTap(),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           color: selected
-              ? const Color(0xFFB8FFE3).withOpacity(0.12)
+              ? const Color(0xFFB8FFE3).withOpacity(0.13)
               : Colors.white.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected
-                ? const Color(0xFFB8FFE3).withOpacity(0.22)
+                ? const Color(0xFFB8FFE3).withOpacity(0.24)
                 : Colors.white.withOpacity(0.06),
           ),
         ),
@@ -3508,7 +4094,7 @@ class _LanguageButton extends StatelessWidget {
           style: TextStyle(
             color: selected
                 ? const Color(0xFFEFFFF8)
-                : Colors.white.withOpacity(0.65),
+                : Colors.white.withOpacity(0.66),
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
@@ -3539,16 +4125,14 @@ class _ToggleRow extends StatelessWidget {
             style: const TextStyle(
               color: Colors.white,
               fontSize: 13.5,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
         Switch.adaptive(
           value: value,
           activeColor: const Color(0xFFB8FFE3),
-          onChanged: (next) async {
-            await onChanged(next);
-          },
+          onChanged: (next) async => onChanged(next),
         ),
       ],
     );
@@ -3566,161 +4150,90 @@ class _BottomBar extends StatelessWidget {
   final String Function(int index) labelBuilder;
   final ValueChanged<int> onChanged;
 
+  IconData _iconFor(int i) {
+    switch (i) {
+      case 0:
+        return Icons.today_outlined;
+      case 1:
+        return Icons.dashboard_outlined;
+      case 2:
+        return Icons.emoji_events_outlined;
+      case 3:
+        return Icons.groups_outlined;
+      case 4:
+        return Icons.person_outline_rounded;
+      default:
+        return Icons.circle_outlined;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final items = <_BottomBarItem>[
-      const _BottomBarItem(Icons.home_filled),
-      const _BottomBarItem(Icons.public),
-      const _BottomBarItem(Icons.bar_chart_rounded),
-      const _BottomBarItem(Icons.groups),
-      const _BottomBarItem(Icons.person_rounded),
-    ];
-
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF091015).withOpacity(0.94),
+          color: const Color(0xFF071015).withOpacity(0.90),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.white.withOpacity(0.08)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.32),
-              blurRadius: 22,
-              offset: const Offset(0, 10),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
         child: Row(
-          children: List.generate(
-            items.length,
-            (i) {
-              final selected = index == i;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => onChanged(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? const Color(0xFFB8FFE3).withOpacity(0.12)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          items[i].icon,
-                          color: selected
-                              ? const Color(0xFFB8FFE3)
-                              : Colors.white.withOpacity(0.58),
-                          size: 22,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          labelBuilder(i),
-                          style: TextStyle(
-                            color: selected
-                                ? const Color(0xFFEFFFF8)
-                                : Colors.white.withOpacity(0.55),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TermsDialog extends StatelessWidget {
-  const _TermsDialog({
-    required this.onAccept,
-  });
-
-  final Future<void> Function() onAccept;
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: const Color(0xFF091015),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Terms of Service',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'ZERON records walking participation, account identity, anti-cheat data, and regional ranking information to operate global decarbonization events and future sponsor rewards.',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.74),
-                fontSize: 13,
-                height: 1.6,
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFB8FFE3).withOpacity(0.14),
-                  foregroundColor: const Color(0xFFEFFFF8),
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
+          children: List.generate(5, (i) {
+            final selected = i == index;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? const Color(0xFFB8FFE3).withOpacity(0.12)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: const Color(0xFFB8FFE3).withOpacity(0.22),
-                    ),
                   ),
-                ),
-                onPressed: () async {
-                  await onAccept();
-                },
-                child: const Text(
-                  'I Accept',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _iconFor(i),
+                        size: 20,
+                        color: selected
+                            ? const Color(0xFFB8FFE3)
+                            : Colors.white.withOpacity(0.58),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        labelBuilder(i),
+                        style: TextStyle(
+                          color: selected
+                              ? const Color(0xFFEFFFF8)
+                              : Colors.white.withOpacity(0.56),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          ],
+            );
+          }),
         ),
       ),
     );
   }
-}
-
-class _BottomBarItem {
-  const _BottomBarItem(this.icon);
-
-  final IconData icon;
 }
 
 class _HomeDemoState {
@@ -3759,8 +4272,22 @@ class _HomeDemoState {
   final int sponsorReadyUsers;
 }
 
+class _TeamDraft {
+  const _TeamDraft({
+    required this.name,
+    required this.kind,
+    required this.makePrimary,
+    this.description,
+  });
+
+  final String name;
+  final String? description;
+  final TeamKind kind;
+  final bool makePrimary;
+}
+
 class _EarthPainter extends CustomPainter {
-  const _EarthPainter({
+  _EarthPainter({
     required this.progress,
     required this.rotation,
     required this.tilt,
@@ -3778,459 +4305,268 @@ class _EarthPainter extends CustomPainter {
   final double userEnergy;
   final double shimmer;
 
-  static const List<_EarthLightPoint> _cityLights = [
-    _EarthLightPoint(lon: -74.0, lat: 40.7, strength: 1.00),
-    _EarthLightPoint(lon: -118.2, lat: 34.0, strength: 0.90),
-    _EarthLightPoint(lon: -87.6, lat: 41.8, strength: 0.72),
-    _EarthLightPoint(lon: -95.3, lat: 29.7, strength: 0.64),
-    _EarthLightPoint(lon: -46.6, lat: -23.5, strength: 0.90),
-    _EarthLightPoint(lon: -58.4, lat: -34.6, strength: 0.62),
-    _EarthLightPoint(lon: -0.1, lat: 51.5, strength: 0.90),
-    _EarthLightPoint(lon: 2.35, lat: 48.85, strength: 0.82),
-    _EarthLightPoint(lon: 13.4, lat: 52.5, strength: 0.70),
-    _EarthLightPoint(lon: 37.6, lat: 55.7, strength: 0.74),
-    _EarthLightPoint(lon: 139.7, lat: 35.6, strength: 1.00),
-    _EarthLightPoint(lon: 135.5, lat: 34.7, strength: 0.68),
-    _EarthLightPoint(lon: 126.9, lat: 37.5, strength: 0.78),
-    _EarthLightPoint(lon: 121.4, lat: 31.2, strength: 0.92),
-    _EarthLightPoint(lon: 116.4, lat: 39.9, strength: 0.80),
-    _EarthLightPoint(lon: 114.1, lat: 22.3, strength: 0.82),
-    _EarthLightPoint(lon: 103.8, lat: 1.35, strength: 0.72),
-    _EarthLightPoint(lon: 77.2, lat: 28.6, strength: 0.82),
-    _EarthLightPoint(lon: 72.8, lat: 19.0, strength: 0.72),
-    _EarthLightPoint(lon: 55.2, lat: 25.2, strength: 0.60),
-    _EarthLightPoint(lon: 31.2, lat: 30.0, strength: 0.56),
-    _EarthLightPoint(lon: 28.0, lat: -26.2, strength: 0.58),
-    _EarthLightPoint(lon: 151.2, lat: -33.8, strength: 0.74),
-  ];
-
-  static const List<_EarthLandEllipse> _landMasses = [
-    _EarthLandEllipse(lon: -105, lat: 48, rx: 26, ry: 18, alpha: 0.90),
-    _EarthLandEllipse(lon: -100, lat: 30, rx: 18, ry: 14, alpha: 0.88),
-    _EarthLandEllipse(lon: -82, lat: 16, rx: 11, ry: 10, alpha: 0.72),
-    _EarthLandEllipse(lon: -60, lat: -15, rx: 18, ry: 26, alpha: 0.88),
-    _EarthLandEllipse(lon: -42, lat: 72, rx: 10, ry: 7, alpha: 0.56),
-    _EarthLandEllipse(lon: 15, lat: 52, rx: 18, ry: 10, alpha: 0.82),
-    _EarthLandEllipse(lon: 20, lat: 10, rx: 20, ry: 27, alpha: 0.88),
-    _EarthLandEllipse(lon: 52, lat: 28, rx: 11, ry: 8, alpha: 0.72),
-    _EarthLandEllipse(lon: 78, lat: 22, rx: 13, ry: 10, alpha: 0.82),
-    _EarthLandEllipse(lon: 102, lat: 44, rx: 34, ry: 20, alpha: 0.92),
-    _EarthLandEllipse(lon: 120, lat: 12, rx: 18, ry: 12, alpha: 0.74),
-    _EarthLandEllipse(lon: 134, lat: -24, rx: 16, ry: 11, alpha: 0.82),
-    _EarthLandEllipse(lon: 47, lat: -19, rx: 7, ry: 11, alpha: 0.60),
-    _EarthLandEllipse(lon: 138, lat: 37, rx: 7, ry: 9, alpha: 0.68),
-  ];
-
   @override
   void paint(Canvas canvas, Size size) {
-    final Offset center = size.center(Offset.zero);
-    final double radius = size.shortestSide * 0.355;
-    final Rect wholeRect = Offset.zero & size;
-    final Rect globeRect = Rect.fromCircle(center: center, radius: radius);
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide * 0.34;
 
-    final Paint bgGlow = Paint()
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    final outerGlow = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFF58E9D8).withOpacity(0.22 + (globalEnergy * 0.12)),
-          const Color(0xFF16333C).withOpacity(0.18),
+          const Color(0xFF7BFFD2).withOpacity(0.18 + userEnergy * 0.10),
+          const Color(0xFF44C7FF).withOpacity(0.06 + globalEnergy * 0.08),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.54, 1.0],
-      ).createShader(wholeRect);
-
-    canvas.drawRect(wholeRect, bgGlow);
-
-    final Paint outerAura = Paint()
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 30)
-      ..color = const Color(0xFF99FFE7)
-          .withOpacity(0.12 + (participationDensity * 0.08));
-
-    canvas.drawCircle(center, radius * 1.16, outerAura);
-
-    final Paint atmosphere = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = radius * 0.045
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
-      ..shader = SweepGradient(
-        colors: [
-          const Color(0xFF94FFF1).withOpacity(0.00),
-          const Color(0xFFB7FFF2).withOpacity(0.75),
-          const Color(0xFF6EF0E0).withOpacity(0.28),
-          const Color(0xFF94FFF1).withOpacity(0.00),
-        ],
-        stops: const [0.00, 0.16, 0.58, 1.00],
-        transform: GradientRotation(rotation * 0.45),
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 1.08));
-
-    final Paint ocean = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.24, -0.34),
-        radius: 1.05,
-        colors: [
-          const Color(0xFF7EF7E7).withOpacity(0.82),
-          const Color(0xFF0F5268).withOpacity(0.96),
-          const Color(0xFF04141D),
-        ],
-        stops: const [0.0, 0.34, 1.0],
-      ).createShader(globeRect);
-
-    canvas.drawCircle(center, radius, ocean);
-
-    canvas.save();
-    canvas.clipPath(Path()..addOval(globeRect));
-
-    final Paint deepShadow = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        colors: [
-          Colors.black.withOpacity(0.52),
-          Colors.transparent,
-          Colors.black.withOpacity(0.42),
-        ],
-        stops: const [0.0, 0.52, 1.0],
-        transform: GradientRotation(rotation * 0.2),
-      ).createShader(globeRect);
-
-    canvas.drawRect(globeRect, deepShadow);
-
-    final Paint rimLight = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          const Color(0xFFC6FFF5).withOpacity(0.36 + (userEnergy * 0.10)),
-          Colors.transparent,
-          const Color(0xFF5FF0E0).withOpacity(0.10),
-        ],
-      ).createShader(globeRect);
-
-    canvas.drawCircle(center, radius, rimLight);
-
-    final Paint gridPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.75
-      ..color = Colors.white.withOpacity(0.06);
-
-    for (int i = -2; i <= 2; i++) {
-      final double lat = i * 22;
-      _drawLatitude(canvas, center, radius, lat.toDouble(), tilt, gridPaint);
-    }
-
-    for (int i = 0; i < 8; i++) {
-      final double lon = i * 45.0 + (rotation * 180 / math.pi);
-      _drawLongitude(canvas, center, radius, lon, tilt, gridPaint);
-    }
-
-    for (final land in _landMasses) {
-      _drawLand(canvas, center, radius, land);
-    }
-
-    _drawCityLights(canvas, center, radius);
-
-    final Paint cloudPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
-      ..color = Colors.white.withOpacity(0.07);
-
-    for (int i = 0; i < 4; i++) {
-      final double inset = radius * (0.08 + (i * 0.08));
-      canvas.drawArc(
-        Rect.fromLTWH(
-          center.dx - radius + inset,
-          center.dy - radius * 0.72 + (i * 8),
-          (radius - inset) * 2,
-          radius * 1.22 - (i * 12),
-        ),
-        -0.9,
-        2.2,
-        false,
-        cloudPaint,
-      );
-    }
-
-    final Paint vignette = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          Colors.transparent,
-          Colors.transparent,
-          Colors.black.withOpacity(0.34),
-        ],
-        stops: const [0.0, 0.68, 1.0],
-      ).createShader(globeRect);
-
-    canvas.drawCircle(center, radius, vignette);
-
-    canvas.restore();
-
-    canvas.drawCircle(center, radius * 1.02, atmosphere);
-
-    final Paint orbitPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.15
-      ..color =
-          const Color(0xFFB8FFE3).withOpacity(0.16 + (globalEnergy * 0.08));
-
-    final Rect orbitA = Rect.fromCenter(
-      center: center,
-      width: radius * 2.72,
-      height: radius * 1.20,
-    );
-    final Rect orbitB = Rect.fromCenter(
-      center: center,
-      width: radius * 2.38,
-      height: radius * 2.38,
-    );
-    final Rect orbitC = Rect.fromCenter(
-      center: center,
-      width: radius * 2.44,
-      height: radius * 1.62,
-    );
-
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-    canvas.rotate(0.24 + (rotation * 0.08));
-    canvas.translate(-center.dx, -center.dy);
-    canvas.drawOval(orbitA, orbitPaint);
-    canvas.restore();
-
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-    canvas.rotate(-0.82 + (rotation * 0.05));
-    canvas.translate(-center.dx, -center.dy);
-    canvas.drawOval(orbitC, orbitPaint);
-    canvas.restore();
-
-    final Paint orbitRing = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.05
-      ..color = Colors.white.withOpacity(0.10);
-
-    canvas.drawOval(orbitB, orbitRing);
-
-    final Paint progressArc = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 5.2
-      ..shader = SweepGradient(
-        colors: [
-          const Color(0x00B8FFE3),
-          const Color(0xFFCCFFF0).withOpacity(0.95),
-          const Color(0xFF70F3E1).withOpacity(0.90),
-          const Color(0x00B8FFE3),
-        ],
-        stops: const [0.00, 0.18, 0.54, 1.00],
-        transform: GradientRotation(-math.pi / 2),
       ).createShader(
-        Rect.fromCircle(center: center, radius: radius + 22),
+        Rect.fromCircle(center: center, radius: radius * 1.9),
       );
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius + 22),
-      -math.pi / 2,
-      math.pi * 2 * progress.clamp(0.0, 1.0),
-      false,
-      progressArc,
-    );
+    canvas.drawCircle(center, radius * 1.82, outerGlow);
 
-    final Paint starPaint = Paint()
-      ..color = Colors.white.withOpacity(0.62);
+    final spherePaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment(
+          -0.28 + math.cos(rotation) * 0.08,
+          -0.24 + math.sin(rotation * 0.8) * 0.06,
+        ),
+        radius: 1.08,
+        colors: [
+          const Color(0xFF17343B),
+          const Color(0xFF0C171D),
+          const Color(0xFF05090C),
+        ],
+        stops: const [0.0, 0.58, 1.0],
+      ).createShader(rect);
 
-    final math.Random random = math.Random(71);
-    for (int i = 0; i < 42; i++) {
-      final double dx = random.nextDouble() * size.width;
-      final double dy = random.nextDouble() * size.height;
-      final Offset point = Offset(dx, dy);
-      if ((point - center).distance > radius * 1.14) {
-        canvas.drawCircle(point, 0.6 + random.nextDouble() * 1.5, starPaint);
-      }
+    canvas.drawCircle(center, radius, spherePaint);
+
+    canvas.save();
+    canvas.clipPath(Path()..addOval(rect));
+
+    final gridPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = Colors.white.withOpacity(0.06 + participationDensity * 0.04)
+      ..strokeWidth = 1.0;
+
+    for (int i = -3; i <= 3; i++) {
+      final y =
+          center.dy + i * radius * 0.24 + math.sin(tilt) * i * radius * 0.05;
+      final ry = radius * (0.22 + (1 - (i.abs() / 4)) * 0.08);
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(center.dx, y),
+          width: radius * 1.90,
+          height: ry * 2,
+        ),
+        gridPaint,
+      );
     }
 
-    final Paint lensGlow = Paint()
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20)
-      ..color = const Color(0xFFBFFFF4)
-          .withOpacity(0.04 + ((globalEnergy + shimmer) * 0.025));
+    for (int i = -4; i <= 4; i++) {
+      final xShift =
+          math.sin(rotation + i * 0.55) * radius * 0.26 * math.cos(tilt);
+      final path = Path();
+      for (double y = -radius; y <= radius; y += 4) {
+        final normalized = y / radius;
+        final curve = math.sin(normalized * math.pi * 0.92) * radius * 0.18;
+        final x = center.dx +
+            (i * radius * 0.18) +
+            xShift +
+            curve * math.sin(rotation + i * 0.35);
+        final py = center.dy + y;
+        if (y == -radius) {
+          path.moveTo(x, py);
+        } else {
+          path.lineTo(x, py);
+        }
+      }
+      canvas.drawPath(path, gridPaint);
+    }
 
-    canvas.drawCircle(
-      Offset(center.dx - radius * 0.28, center.dy - radius * 0.42),
-      radius * 0.22,
-      lensGlow,
-    );
-  }
+    final continentsPaint = Paint()
+      ..color = const Color(0xFF91FFD8).withOpacity(0.16 + shimmer * 0.06)
+      ..style = PaintingStyle.fill;
 
-  void _drawLand(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    _EarthLandEllipse land,
-  ) {
-    final _SpherePoint projection = _project(
-      lonDeg: land.lon,
-      latDeg: land.lat,
-      center: center,
-      radius: radius,
-    );
+    final continentStroke = Paint()
+      ..color = const Color(0xFFC6FFEE).withOpacity(0.14)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.9;
 
-    if (!projection.visible) return;
+    final continents = _projectedContinents(center, radius);
+    for (final path in continents) {
+      canvas.drawPath(path, continentsPaint);
+      canvas.drawPath(path, continentStroke);
+    }
 
-    final double w = radius * (land.rx / 90) * projection.scale;
-    final double h = radius * (land.ry / 90) * projection.scale * 1.12;
+    final activityPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
 
-    final Rect rect = Rect.fromCenter(
-      center: projection.offset,
-      width: w * 2.0,
-      height: h * 2.0,
-    );
+    final dots = _activityDots(center, radius);
+    for (final dot in dots) {
+      final alpha = dot.$3;
+      activityPaint.color = dot.$4.withOpacity(alpha);
+      canvas.drawCircle(dot.$1, dot.$2, activityPaint);
+    }
 
-    final Paint landPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+    final atmosphere = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..shader = SweepGradient(
+        startAngle: 0,
+        endAngle: math.pi * 2,
         colors: [
-          const Color(0xFFC8FFE0).withOpacity(
-            (0.20 + (participationDensity * 0.08)) * land.alpha * projection.alpha,
-          ),
-          const Color(0xFF9AEBC8).withOpacity(
-            (0.10 + (globalEnergy * 0.08)) * land.alpha * projection.alpha,
-          ),
-          const Color(0xFF6CCCB2).withOpacity(
-            0.05 * land.alpha * projection.alpha,
-          ),
+          const Color(0xFF6FFFE0).withOpacity(0.10),
+          const Color(0xFF4CB9FF).withOpacity(0.28 + globalEnergy * 0.16),
+          const Color(0xFFB8FFE3).withOpacity(0.14 + progress * 0.10),
+          const Color(0xFF6FFFE0).withOpacity(0.10),
         ],
       ).createShader(rect);
 
-    canvas.save();
-    canvas.translate(projection.offset.dx, projection.offset.dy);
-    canvas.rotate(-rotation * 0.06);
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: Offset.zero,
-        width: w * 2.0,
-        height: h * 2.0,
-      ),
-      landPaint,
-    );
     canvas.restore();
-  }
 
-  void _drawCityLights(Canvas canvas, Offset center, double radius) {
-    for (final city in _cityLights) {
-      final _SpherePoint projection = _project(
-        lonDeg: city.lon,
-        latDeg: city.lat,
-        center: center,
-        radius: radius,
+    canvas.drawCircle(center, radius + 1.4, atmosphere);
+
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..color = Colors.white.withOpacity(0.08);
+
+    canvas.drawCircle(center, radius * 1.18, ringPaint);
+
+    final progressPaintBg = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withOpacity(0.08);
+
+    final progressPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        startAngle: -math.pi / 2,
+        endAngle: math.pi * 1.5,
+        colors: [
+          const Color(0xFF6FFFE0),
+          const Color(0xFF4CB9FF),
+          const Color(0xFFB8FFE3),
+        ],
+      ).createShader(
+        Rect.fromCircle(center: center, radius: radius * 1.35),
       );
 
-      if (!projection.visible) continue;
+    final progressRect =
+        Rect.fromCircle(center: center, radius: radius * 1.35);
 
-      final double intensity = city.strength *
-          (0.30 + (globalEnergy * 0.55) + (participationDensity * 0.22)) *
-          projection.alpha;
-
-      final double glowSize = radius * (0.010 + (city.strength * 0.010));
-
-      final Paint glow = Paint()
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
-        ..color = const Color(0xFFC7FFF1).withOpacity(intensity * 0.42);
-
-      final Paint core = Paint()
-        ..color = const Color(0xFFE7FFF8).withOpacity(intensity * 0.90);
-
-      canvas.drawCircle(projection.offset, glowSize * 3.1, glow);
-      canvas.drawCircle(projection.offset, glowSize, core);
-    }
-  }
-
-  void _drawLatitude(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    double latDeg,
-    double tilt,
-    Paint paint,
-  ) {
-    final double y = radius * math.sin(_degToRad(latDeg)) * math.cos(tilt);
-    final double rx = radius * math.cos(_degToRad(latDeg));
-    final double ry = rx * math.cos(tilt);
-
-    final Rect rect = Rect.fromCenter(
-      center: Offset(center.dx, center.dy - y * math.sin(tilt) * 0.18),
-      width: rx * 2,
-      height: ry * 2,
+    canvas.drawArc(
+      progressRect,
+      -math.pi / 2,
+      math.pi * 2,
+      false,
+      progressPaintBg,
     );
-
-    canvas.drawOval(rect, paint);
-  }
-
-  void _drawLongitude(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    double lonDeg,
-    double tilt,
-    Paint paint,
-  ) {
-    final Path path = Path();
-    bool started = false;
-
-    for (double lat = -90; lat <= 90; lat += 2) {
-      final _SpherePoint point = _project(
-        lonDeg: lonDeg,
-        latDeg: lat,
-        center: center,
-        radius: radius,
-      );
-
-      if (!point.visible) {
-        started = false;
-        continue;
-      }
-
-      if (!started) {
-        path.moveTo(point.offset.dx, point.offset.dy);
-        started = true;
-      } else {
-        path.lineTo(point.offset.dx, point.offset.dy);
-      }
-    }
-
-    canvas.drawPath(path, paint);
-  }
-
-  _SpherePoint _project({
-    required double lonDeg,
-    required double latDeg,
-    required Offset center,
-    required double radius,
-  }) {
-    final double lon = _degToRad(lonDeg) + rotation;
-    final double lat = _degToRad(latDeg);
-
-    final double x = math.cos(lat) * math.sin(lon);
-    final double y = math.sin(lat);
-    final double z = math.cos(lat) * math.cos(lon);
-
-    final double yTilt = (y * math.cos(tilt)) - (z * math.sin(tilt));
-    final double zTilt = (y * math.sin(tilt)) + (z * math.cos(tilt));
-
-    final bool visible = zTilt > -0.06;
-    final double alpha = ((zTilt + 1) / 2).clamp(0.18, 1.0);
-    final double scale = (0.84 + (zTilt * 0.18)).clamp(0.72, 1.0);
-
-    return _SpherePoint(
-      visible: visible,
-      alpha: alpha,
-      scale: scale,
-      offset: Offset(
-        center.dx + (x * radius),
-        center.dy - (yTilt * radius),
-      ),
+    canvas.drawArc(
+      progressRect,
+      -math.pi / 2,
+      math.pi * 2 * progress.clamp(0.0, 1.0),
+      false,
+      progressPaint,
     );
   }
 
-  double _degToRad(double deg) {
-    return deg * math.pi / 180.0;
+  List<Path> _projectedContinents(Offset center, double radius) {
+    final List<List<Offset>> continentShapes = [
+      [
+        const Offset(-0.48, -0.10),
+        const Offset(-0.62, -0.18),
+        const Offset(-0.68, -0.06),
+        const Offset(-0.58, 0.08),
+        const Offset(-0.50, 0.20),
+        const Offset(-0.42, 0.14),
+        const Offset(-0.44, -0.02),
+      ],
+      [
+        const Offset(-0.10, -0.24),
+        const Offset(0.10, -0.30),
+        const Offset(0.28, -0.18),
+        const Offset(0.24, 0.00),
+        const Offset(0.12, 0.08),
+        const Offset(-0.04, 0.02),
+        const Offset(-0.16, -0.12),
+      ],
+      [
+        const Offset(0.26, 0.10),
+        const Offset(0.40, 0.06),
+        const Offset(0.52, 0.16),
+        const Offset(0.48, 0.30),
+        const Offset(0.34, 0.34),
+        const Offset(0.24, 0.22),
+      ],
+      [
+        const Offset(0.56, -0.28),
+        const Offset(0.68, -0.22),
+        const Offset(0.72, -0.10),
+        const Offset(0.60, -0.06),
+        const Offset(0.50, -0.16),
+      ],
+    ];
+
+    return continentShapes.map((points) {
+      final path = Path();
+      for (int i = 0; i < points.length; i++) {
+        final projected = _projectPoint(points[i], center, radius);
+        if (i == 0) {
+          path.moveTo(projected.dx, projected.dy);
+        } else {
+          path.lineTo(projected.dx, projected.dy);
+        }
+      }
+      path.close();
+      return path;
+    }).toList();
+  }
+
+  Offset _projectPoint(Offset point, Offset center, double radius) {
+    final double x = point.dx;
+    final double y = point.dy + tilt * 0.35;
+
+    final double rotatedX = x * math.cos(rotation) - y * math.sin(rotation) * 0.12;
+    final double depth = 1 - (rotatedX.abs() * 0.22);
+    final double px = center.dx + rotatedX * radius * 1.05;
+    final double py = center.dy + y * radius * (0.94 + depth * 0.10);
+
+    return Offset(px, py);
+  }
+
+  List<(Offset, double, double, Color)> _activityDots(
+    Offset center,
+    double radius,
+  ) {
+    final dots = <(Offset, double, double, Color)>[];
+    final seeds = <Offset>[
+      const Offset(-0.44, -0.04),
+      const Offset(-0.54, 0.14),
+      const Offset(0.02, -0.18),
+      const Offset(0.18, -0.02),
+      const Offset(0.34, 0.20),
+      const Offset(0.58, -0.16),
+    ];
+
+    for (int i = 0; i < seeds.length; i++) {
+      final p = _projectPoint(seeds[i], center, radius);
+      final wave = (math.sin(rotation * 1.7 + i * 0.8) * 0.5 + 0.5);
+      final alpha = 0.12 + wave * (0.20 + participationDensity * 0.24);
+      final dotRadius = radius * (0.02 + wave * 0.016);
+      final color = i.isEven
+          ? const Color(0xFF6FFFE0)
+          : const Color(0xFF4CB9FF);
+      dots.add((p, dotRadius, alpha, color));
+    }
+
+    return dots;
   }
 
   @override
@@ -4245,54 +4581,10 @@ class _EarthPainter extends CustomPainter {
   }
 }
 
-class _SpherePoint {
-  const _SpherePoint({
-    required this.visible,
-    required this.alpha,
-    required this.scale,
-    required this.offset,
-  });
-
-  final bool visible;
-  final double alpha;
-  final double scale;
-  final Offset offset;
-}
-
-class _EarthLightPoint {
-  const _EarthLightPoint({
-    required this.lon,
-    required this.lat,
-    required this.strength,
-  });
-
-  final double lon;
-  final double lat;
-  final double strength;
-}
-
-class _EarthLandEllipse {
-  const _EarthLandEllipse({
-    required this.lon,
-    required this.lat,
-    required this.rx,
-    required this.ry,
-    required this.alpha,
-  });
-
-  final double lon;
-  final double lat;
-  final double rx;
-  final double ry;
-  final double alpha;
-}
-
 BoxDecoration _panelDecoration({bool highlighted = false}) {
   return BoxDecoration(
-    color: highlighted
-        ? const Color(0xFF0E181A)
-        : const Color(0xFF091015).withOpacity(0.92),
-    borderRadius: BorderRadius.circular(22),
+    color: const Color(0xFF071015).withOpacity(highlighted ? 0.82 : 0.72),
+    borderRadius: BorderRadius.circular(24),
     border: Border.all(
       color: highlighted
           ? const Color(0xFFB8FFE3).withOpacity(0.20)
@@ -4300,12 +4592,35 @@ BoxDecoration _panelDecoration({bool highlighted = false}) {
     ),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.18),
+        color: Colors.black.withOpacity(0.24),
         blurRadius: 18,
-        offset: const Offset(0, 8),
+        offset: const Offset(0, 10),
       ),
     ],
   );
+}
+
+String _formatNumber(int value) {
+  final text = value.toString();
+  final buffer = StringBuffer();
+  for (int i = 0; i < text.length; i++) {
+    final reverseIndex = text.length - i;
+    buffer.write(text[i]);
+    if (reverseIndex > 1 && reverseIndex % 3 == 1) {
+      buffer.write(',');
+    }
+  }
+  return buffer.toString();
+}
+
+String _formatNumberDouble(double value) {
+  final fixed = value.toStringAsFixed(value >= 100 ? 0 : 2);
+  final parts = fixed.split('.');
+  final whole = int.tryParse(parts.first) ?? 0;
+  final wholeFormatted = _formatNumber(whole);
+  if (parts.length == 1) return wholeFormatted;
+  if (int.tryParse(parts[1]) == 0) return wholeFormatted;
+  return '$wholeFormatted.${parts[1]}';
 }
 
 String _planLabel(ZeronPlan plan) {
@@ -4313,203 +4628,10 @@ String _planLabel(ZeronPlan plan) {
     case ZeronPlan.free:
       return 'Free';
     case ZeronPlan.plus:
-      return 'ZERON+';
-    case ZeronPlan.sponsor:
-      return 'Sponsor';
-  }
-}
-
-String _formatNumber(int value) {
-  final source = value.abs().toString();
-  final buffer = StringBuffer();
-  for (int i = 0; i < source.length; i++) {
-    final position = source.length - i;
-    buffer.write(source[i]);
-    if (position > 1 && position % 3 == 1) {
-      buffer.write(',');
-    }
-  }
-  final result = buffer.toString();
-  return value < 0 ? '-$result' : result;
-}
-
-String _formatNumberDouble(double value) {
-  return _formatNumber(value.round());
-}
-
-class _TeamDraft {
-  const _TeamDraft({
-    required this.name,
-    required this.kind,
-    required this.description,
-    required this.makePrimary,
-  });
-
-  final String name;
-  final TeamKind kind;
-  final String description;
-  final bool makePrimary;
-}
-
-class _CreateTeamDialog extends StatefulWidget {
-  const _CreateTeamDialog({
-    required this.t,
-  });
-
-  final String Function(String en, String ja) t;
-
-  @override
-  State<_CreateTeamDialog> createState() => _CreateTeamDialogState();
-}
-
-class _CreateTeamDialogState extends State<_CreateTeamDialog> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-
-  TeamKind _kind = TeamKind.team;
-  bool _makePrimary = false;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  void _create() {
-    final name = _nameController.text.trim();
-    final description = _descriptionController.text.trim();
-
-    if (name.isEmpty) return;
-
-    Navigator.of(context).pop(
-      _TeamDraft(
-        name: name,
-        kind: _kind,
-        description: description.isEmpty
-            ? widget.t(
-                'Live local team running on this device.',
-                'この端末上で稼働するローカルライブチームです。',
-              )
-            : description,
-        makePrimary: _makePrimary,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: const Color(0xFF091015),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-        side: BorderSide(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.t('Create Team', 'チームを作成'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _FormField(
-                controller: _nameController,
-                label: widget.t('Team Name', 'チーム名'),
-              ),
-              const SizedBox(height: 12),
-              _FormField(
-                controller: _descriptionController,
-                label: widget.t('Description', '説明'),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<TeamKind>(
-                    value: _kind,
-                    dropdownColor: const Color(0xFF091015),
-                    style: const TextStyle(color: Colors.white),
-                    items: [
-                      DropdownMenuItem(
-                        value: TeamKind.friends,
-                        child: Text(widget.t('Friends', 'フレンズ')),
-                      ),
-                      DropdownMenuItem(
-                        value: TeamKind.team,
-                        child: Text(widget.t('Team', 'チーム')),
-                      ),
-                      DropdownMenuItem(
-                        value: TeamKind.company,
-                        child: Text(widget.t('Company', 'カンパニー')),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() {
-                        _kind = value;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                activeColor: const Color(0xFFB8FFE3),
-                title: Text(
-                  widget.t('Set as Primary Team', 'メインチームに設定'),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                value: _makePrimary,
-                onChanged: (value) {
-                  setState(() {
-                    _makePrimary = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFB8FFE3).withOpacity(0.14),
-                    foregroundColor: const Color(0xFFEFFFF8),
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: const Color(0xFFB8FFE3).withOpacity(0.22),
-                      ),
-                    ),
-                  ),
-                  onPressed: _create,
-                  child: Text(
-                    widget.t('Create', '作成'),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+      return 'Plus';
+    case ZeronPlan.pro:
+      return 'Pro';
+    case ZeronPlan.enterprise:
+      return 'Enterprise';
   }
 }

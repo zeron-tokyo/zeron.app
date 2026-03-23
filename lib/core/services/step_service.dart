@@ -12,9 +12,12 @@ class StepService {
       StreamController<int>.broadcast();
 
   static bool _isInitialized = false;
+  static bool _permissionGranted = false;
   static int? _baseSteps;
   static int _latestSteps = 0;
   static String? _activeDateKey;
+  static String _lastSyncStatus = 'Not synced';
+  static String _dataSource = 'Apple Health / Pedometer';
 
   /// ===============================
   /// 初期化
@@ -29,16 +32,21 @@ class StepService {
     final permission = await Permission.activityRecognition.request();
 
     if (!permission.isGranted) {
+      _permissionGranted = false;
+      _lastSyncStatus = 'Permission denied';
       _emitSafely(0);
       return;
     }
 
+    _permissionGranted = true;
     _isInitialized = true;
     _activeDateKey = _todayKey();
+    _lastSyncStatus = 'Connected';
 
     _subscription = Pedometer.stepCountStream.listen(
       _handleStepEvent,
       onError: (_) {
+        _lastSyncStatus = 'Sensor error';
         _emitSafely(_latestSteps);
       },
       cancelOnError: false,
@@ -52,6 +60,7 @@ class StepService {
       _activeDateKey = nowKey;
       _baseSteps = event.steps;
       _latestSteps = 0;
+      _lastSyncStatus = 'Connected';
       _emitSafely(0);
       return;
     }
@@ -60,6 +69,7 @@ class StepService {
 
     final currentSteps = event.steps - (_baseSteps ?? event.steps);
     _latestSteps = currentSteps < 0 ? 0 : currentSteps;
+    _lastSyncStatus = 'Connected';
 
     _emitSafely(_latestSteps);
   }
@@ -73,6 +83,12 @@ class StepService {
   /// 現在歩数
   /// ===============================
   static int get currentSteps => _latestSteps;
+
+  static bool get isPermissionGranted => _permissionGranted;
+
+  static String get syncStatus => _lastSyncStatus;
+
+  static String get dataSource => _dataSource;
 
   /// ===============================
   /// 今日のSummary生成
@@ -132,6 +148,8 @@ class StepService {
     _latestSteps = 0;
     _activeDateKey = null;
     _isInitialized = false;
+    _permissionGranted = false;
+    _lastSyncStatus = 'Not synced';
     _emitSafely(0);
   }
 
@@ -145,6 +163,8 @@ class StepService {
     _latestSteps = 0;
     _activeDateKey = null;
     _isInitialized = false;
+    _permissionGranted = false;
+    _lastSyncStatus = 'Not synced';
 
     if (!_stepController.isClosed) {
       await _stepController.close();
