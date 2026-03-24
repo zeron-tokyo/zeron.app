@@ -1231,21 +1231,20 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
   bool _soundOn = true;
   bool _notificationsOn = true;
 
-  late ZeronUser _user;
-  late DailyImpactSummary _todaySummary;
-  late GlobalImpactSnapshot _global;
-  late TeamModel _primaryTeam;
-  late TeamModel _friendsTeam;
-  late TeamModel _coreTeam;
-  late TeamModel _companyTeam;
-  late List<RankEntryModel> _worldRank;
-  late List<RankEntryModel> _countryRank;
-  late List<RankEntryModel> _cityRank;
-  late List<RankEntryModel> _teamRank;
-  late String _monthlyEventTitle;
-  late String _monthlyEventDescription;
-  late int _eventDaysLeft;
-  late int _sponsorReadyUsers;
+late ZeronUser _user;
+late DailyImpactSummary _todaySummary;
+late GlobalImpactSnapshot _global;
+late TeamModel _primaryTeam;
+late TeamModel _coreTeam;
+late TeamModel _companyTeam;
+late List<RankEntryModel> _worldRank;
+late List<RankEntryModel> _countryRank;
+late List<RankEntryModel> _cityRank;
+late List<RankEntryModel> _teamRank;
+late String _monthlyEventTitle;
+late String _monthlyEventDescription;
+late int _eventDaysLeft;
+late int _sponsorReadyUsers;
 
   final List<TeamModel> _teams = <TeamModel>[];
 
@@ -1330,180 +1329,199 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     });
   }
 
-  Future<void> _loadRuntimeState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final todayKey = _dateKey(now);
+Future<void> _loadRuntimeState() async {
+  final prefs = await SharedPreferences.getInstance();
+  final now = DateTime.now();
+  final todayKey = _dateKey(now);
 
-    final displayName = prefs.getString(_profileNameKey);
-    final email = prefs.getString(_profileEmailKey) ?? '';
-    final country = prefs.getString(_profileCountryKey) ?? 'Japan';
-    final region = prefs.getString(_profileRegionKey) ?? 'Tokyo';
+  final displayName = prefs.getString(_profileNameKey);
+  final email = prefs.getString(_profileEmailKey) ?? '';
+  final country = prefs.getString(_profileCountryKey) ?? 'Japan';
+  final region = prefs.getString(_profileRegionKey) ?? 'Tokyo';
 
-    final persistedDate = prefs.getString(_persistLastDateKey);
-    final persistedTotalSteps = prefs.getInt(_persistTotalStepsKey) ?? 0;
-    final persistedTotalCo2 = prefs.getDouble(_persistTotalCo2Key) ?? 0.0;
-    final persistedTotalPoints = prefs.getInt(_persistTotalPointsKey) ?? 0;
+  final persistedDate = prefs.getString(_persistLastDateKey);
+  final persistedTotalSteps = prefs.getInt(_persistTotalStepsKey) ?? 0;
+  final persistedTotalCo2 = prefs.getDouble(_persistTotalCo2Key) ?? 0.0;
+  final persistedTotalPoints = prefs.getInt(_persistTotalPointsKey) ?? 0;
 
-    final liveTodaySteps = StepService.currentSteps;
-    final liveSummary = StepService.buildSummary(liveTodaySteps);
+  final liveTodaySteps = StepService.currentSteps;
+  final liveSummary = StepService.buildSummary(liveTodaySteps);
 
-    final totalSteps = persistedDate == todayKey
-        ? (persistedTotalSteps - liveTodaySteps).clamp(0, 1 << 30) +
-            liveTodaySteps
-        : persistedTotalSteps;
+  final totalSteps = persistedDate == todayKey
+      ? (persistedTotalSteps - liveTodaySteps).clamp(0, 1 << 30) +
+          liveTodaySteps
+      : persistedTotalSteps;
 
-    final totalCo2 = persistedDate == todayKey
-        ? (persistedTotalCo2 - liveSummary.totalCo2KgSaved)
-                .clamp(0.0, double.infinity) +
-            liveSummary.totalCo2KgSaved
-        : persistedTotalCo2;
+  final totalCo2 = persistedDate == todayKey
+      ? (persistedTotalCo2 - liveSummary.totalCo2KgSaved)
+              .clamp(0.0, double.infinity) +
+          liveSummary.totalCo2KgSaved
+      : persistedTotalCo2;
 
-    final totalPoints = persistedDate == todayKey
-        ? (persistedTotalPoints - liveSummary.totalPrimePoints)
-                .clamp(0, 1 << 30) +
-            liveSummary.totalPrimePoints
-        : persistedTotalPoints;
+  final totalPoints = persistedDate == todayKey
+      ? (persistedTotalPoints - liveSummary.totalPrimePoints)
+              .clamp(0, 1 << 30) +
+          liveSummary.totalPrimePoints
+      : persistedTotalPoints;
 
-    _todaySummary = liveSummary;
+  _todaySummary = liveSummary;
 
-    _user = ZeronUser(
-      id: 'zeron_local_user',
-      email: email,
-      countryCode: 'JP',
-      countryName: country.isEmpty ? 'Japan' : country,
-      city: region.isEmpty ? 'Tokyo' : region,
-      plan: ZeronPlan.free,
-      termsAccepted: true,
-      createdAt: now,
-      updatedAt: now,
-      lastActiveAt: now,
-      displayName: (displayName == null || displayName.trim().isEmpty)
-          ? 'ZERON User'
-          : displayName.trim(),
-      primaryTeamId: null,
-      totalSteps: totalSteps,
-      totalCo2KgSaved: totalCo2,
-      totalPrimePoints: totalPoints,
-      todaySteps: liveSummary.totalSteps,
-      todayCo2KgSaved: liveSummary.totalCo2KgSaved,
-      todayPrimePoints: liveSummary.totalPrimePoints,
-      worldRank: 1,
-      countryRank: 1,
-      cityRank: 1,
-      teamRank: 1,
-    );
+  _user = ZeronUser(
+    id: 'zeron_local_user',
+    email: email,
+    countryCode: 'JP',
+    countryName: country.isEmpty ? 'Japan' : country,
+    city: region.isEmpty ? 'Tokyo' : region,
+    plan: ZeronPlan.free,
+    termsAccepted: true,
+    createdAt: now,
+    updatedAt: now,
+    lastActiveAt: now,
+    displayName: (displayName == null || displayName.trim().isEmpty)
+        ? 'ZERON User'
+        : displayName.trim(),
+    primaryTeamId: null,
+    totalSteps: totalSteps,
+    totalCo2KgSaved: totalCo2,
+    totalPrimePoints: totalPoints,
+    todaySteps: liveSummary.totalSteps,
+    todayCo2KgSaved: liveSummary.totalCo2KgSaved,
+    todayPrimePoints: liveSummary.totalPrimePoints,
+    worldRank: 1,
+    countryRank: 1,
+    cityRank: 1,
+    teamRank: 1,
+  );
 
-    _teams
-      ..clear()
-      ..addAll(_loadTeamsFromPrefs(prefs, now));
+  _teams
+    ..clear()
+    ..addAll(_loadTeamsFromPrefs(prefs, now));
 
-    if (_teams.isEmpty) {
-      _teams.add(
-        TeamModel(
-          id: 'team_${now.microsecondsSinceEpoch}',
-          name: 'My Team',
-          kind: TeamKind.team,
+  if (_teams.isEmpty) {
+    _teams.addAll([
+      TeamModel(
+        id: 'team_${now.microsecondsSinceEpoch}',
+        name: 'My Team',
+        kind: TeamKind.team,
+        ownerUserId: _user.id,
+        memberCount: 1,
+        totalSteps: _user.totalSteps,
+        totalCo2KgSaved: _user.totalCo2KgSaved,
+        totalPrimePoints: _user.totalPrimePoints,
+        createdAt: now,
+        updatedAt: now,
+        description: 'Primary local contribution team.',
+        countryCode: _user.countryCode,
+        city: _user.city,
+      ),
+      TeamModel(
+        id: 'company_${now.microsecondsSinceEpoch}',
+        name: 'ZERON Company',
+        kind: TeamKind.company,
+        ownerUserId: _user.id,
+        memberCount: 12,
+        totalSteps: (_user.totalSteps * 8.2).round(),
+        totalCo2KgSaved: _user.totalCo2KgSaved * 8.2,
+        totalPrimePoints: (_user.totalPrimePoints * 8.2).round(),
+        createdAt: now,
+        updatedAt: now,
+        description: 'Company participation and future carbon reporting layer.',
+        countryCode: _user.countryCode,
+        city: _user.city,
+      ),
+    ]);
+  }
+
+  final storedPrimaryId = prefs.getString(_persistPrimaryTeamIdKey);
+  _primaryTeam = _teams.firstWhere(
+    (team) => team.id == storedPrimaryId && team.kind == TeamKind.team,
+    orElse: () => _teams.firstWhere(
+      (team) => team.kind == TeamKind.team,
+      orElse: () => _teams.first,
+    ),
+  );
+
+  _coreTeam = _primaryTeam;
+  _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
+
+  _monthlyEventTitle = 'Daily Earth Impact';
+  _monthlyEventDescription =
+      'Live walking data is transformed into visible CO₂ reduction and participation value.';
+  _eventDaysLeft = 0;
+  _sponsorReadyUsers = 1;
+
+  await _saveTeams();
+  _rebuildComputedState();
+}
+
+TeamModel? _firstTeamOfKind(TeamKind kind) {
+  for (final team in _teams) {
+    if (team.kind == kind) return team;
+  }
+  return null;
+}
+
+List<TeamModel> _loadTeamsFromPrefs(SharedPreferences prefs, DateTime now) {
+  final raw = prefs.getStringList(_persistTeamsKey) ?? <String>[];
+  return raw
+      .map((item) {
+        final parts = item.split('|||');
+        if (parts.length < 9) return null;
+
+        final kind = switch (parts[2]) {
+          'team' => TeamKind.team,
+          'company' => TeamKind.company,
+          _ => TeamKind.team,
+        };
+
+        return TeamModel(
+          id: parts[0],
+          name: parts[1],
+          kind: kind,
           ownerUserId: _user.id,
-          memberCount: 1,
-          totalSteps: _user.totalSteps,
-          totalCo2KgSaved: _user.totalCo2KgSaved,
-          totalPrimePoints: _user.totalPrimePoints,
-          createdAt: now,
-          updatedAt: now,
-          description: 'Your primary local impact team.',
+          memberCount: int.tryParse(parts[3]) ?? 1,
+          totalSteps: int.tryParse(parts[4]) ?? 0,
+          totalCo2KgSaved: double.tryParse(parts[5]) ?? 0.0,
+          totalPrimePoints: int.tryParse(parts[6]) ?? 0,
+          createdAt: DateTime.tryParse(parts[7]) ?? now,
+          updatedAt: DateTime.tryParse(parts[8]) ?? now,
+          description: parts.length > 9 && parts[9].trim().isNotEmpty
+              ? parts[9].trim()
+              : null,
           countryCode: _user.countryCode,
           city: _user.city,
-        ),
-      );
-      await _saveTeams();
-    }
+        );
+      })
+      .whereType<TeamModel>()
+      .toList();
+}
 
-    final storedPrimaryId = prefs.getString(_persistPrimaryTeamIdKey);
-    _primaryTeam = _teams.firstWhere(
-      (team) => team.id == storedPrimaryId,
-      orElse: () => _teams.first,
-    );
+Future<void> _saveTeams() async {
+  final prefs = await SharedPreferences.getInstance();
+  final payload = _teams
+      .map(
+        (team) => [
+          team.id,
+          team.name,
+          switch (team.kind) {
+            TeamKind.team => 'team',
+            TeamKind.company => 'company',
+            TeamKind.friends => 'team',
+          },
+          '${team.memberCount}',
+          '${team.totalSteps}',
+          '${team.totalCo2KgSaved}',
+          '${team.totalPrimePoints}',
+          team.createdAt.toIso8601String(),
+          team.updatedAt.toIso8601String(),
+          team.description ?? '',
+        ].join('|||'),
+      )
+      .toList();
 
-    _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
-    _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
-    _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
-
-    _monthlyEventTitle = 'Daily Earth Impact';
-    _monthlyEventDescription =
-        'Your live step data is measured on-device and converted to visible impact in real time.';
-    _eventDaysLeft = 0;
-    _sponsorReadyUsers = 1;
-
-    _rebuildComputedState();
-  }
-
-  TeamModel? _firstTeamOfKind(TeamKind kind) {
-    for (final team in _teams) {
-      if (team.kind == kind) return team;
-    }
-    return null;
-  }
-
-  List<TeamModel> _loadTeamsFromPrefs(SharedPreferences prefs, DateTime now) {
-    final raw = prefs.getStringList(_persistTeamsKey) ?? <String>[];
-    return raw
-        .map((item) {
-          final parts = item.split('|||');
-          if (parts.length < 9) return null;
-
-          final kind = switch (parts[2]) {
-            'friends' => TeamKind.friends,
-            'team' => TeamKind.team,
-            _ => TeamKind.company,
-          };
-
-          return TeamModel(
-            id: parts[0],
-            name: parts[1],
-            kind: kind,
-            ownerUserId: _user.id,
-            memberCount: int.tryParse(parts[3]) ?? 1,
-            totalSteps: int.tryParse(parts[4]) ?? 0,
-            totalCo2KgSaved: double.tryParse(parts[5]) ?? 0.0,
-            totalPrimePoints: int.tryParse(parts[6]) ?? 0,
-            createdAt: DateTime.tryParse(parts[7]) ?? now,
-            updatedAt: DateTime.tryParse(parts[8]) ?? now,
-            description: parts.length > 9 ? parts[9] : null,
-            countryCode: _user.countryCode,
-            city: _user.city,
-          );
-        })
-        .whereType<TeamModel>()
-        .toList();
-  }
-
-  Future<void> _saveTeams() async {
-    final prefs = await SharedPreferences.getInstance();
-    final payload = _teams
-        .map(
-          (team) => [
-            team.id,
-            team.name,
-            switch (team.kind) {
-              TeamKind.friends => 'friends',
-              TeamKind.team => 'team',
-              TeamKind.company => 'company',
-            },
-            '${team.memberCount}',
-            '${team.totalSteps}',
-            '${team.totalCo2KgSaved}',
-            '${team.totalPrimePoints}',
-            team.createdAt.toIso8601String(),
-            team.updatedAt.toIso8601String(),
-            team.description ?? '',
-          ].join('|||'),
-        )
-        .toList();
-
-    await prefs.setStringList(_persistTeamsKey, payload);
-    await prefs.setString(_persistPrimaryTeamIdKey, _primaryTeam.id);
-  }
+  await prefs.setStringList(_persistTeamsKey, payload);
+  await prefs.setString(_persistPrimaryTeamIdKey, _primaryTeam.id);
+}
 
   void _bindStepStream() {
     _stepSubscription?.cancel();
@@ -1559,177 +1577,179 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     });
   }
 
-  void _syncTeamsWithUser() {
-    for (int i = 0; i < _teams.length; i++) {
-      final team = _teams[i];
-      if (team.id == _primaryTeam.id) {
-        _teams[i] = TeamModel(
-          id: team.id,
-          name: team.name,
-          kind: team.kind,
-          ownerUserId: team.ownerUserId,
-          memberCount: team.memberCount,
-          totalSteps: _user.totalSteps,
-          totalCo2KgSaved: _user.totalCo2KgSaved,
-          totalPrimePoints: _user.totalPrimePoints,
-          createdAt: team.createdAt,
-          updatedAt: DateTime.now(),
-          description: team.description,
-          countryCode: team.countryCode,
-          city: team.city,
-        );
-        _primaryTeam = _teams[i];
-        break;
-      }
+void _syncTeamsWithUser() {
+  for (int i = 0; i < _teams.length; i++) {
+    final team = _teams[i];
+    if (team.id == _primaryTeam.id) {
+      _teams[i] = TeamModel(
+        id: team.id,
+        name: team.name,
+        kind: team.kind,
+        ownerUserId: team.ownerUserId,
+        memberCount: team.memberCount,
+        totalSteps: _user.totalSteps,
+        totalCo2KgSaved: _user.totalCo2KgSaved,
+        totalPrimePoints: _user.totalPrimePoints,
+        createdAt: team.createdAt,
+        updatedAt: DateTime.now(),
+        description: team.description,
+        countryCode: team.countryCode,
+        city: team.city,
+      );
+      _primaryTeam = _teams[i];
+      break;
     }
-
-    _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
-    _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
-    _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
   }
 
-  void _rebuildComputedState() {
-    final activeTeams = _teams.length;
-    final totalTeamSteps = _teams.fold<int>(0, (sum, team) => sum + team.totalSteps);
-    final totalTeamPoints =
-        _teams.fold<int>(0, (sum, team) => sum + team.totalPrimePoints);
-    final totalTeamCo2 =
-        _teams.fold<double>(0.0, (sum, team) => sum + team.totalCo2KgSaved);
-    final totalMembers = _teams.fold<int>(0, (sum, team) => sum + team.memberCount);
+  _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
+  _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
+}
 
-    _global = GlobalImpactSnapshot(
-      activeUsers: 1,
-      activeTeams: activeTeams,
-      activeCountries: 1,
-      activeCities: 1,
-      totalStepsToday: _user.todaySteps,
-      totalStepsThisMonth: _user.totalSteps,
-      totalCo2KgSaved: _user.totalCo2KgSaved,
-      totalPrimePoints: _user.totalPrimePoints,
-      rewardPoolYen: _user.totalPrimePoints,
-      updatedAt: DateTime.now(),
-    );
+void _rebuildComputedState() {
+  final activeTeams = _teams.where((team) => team.kind == TeamKind.team).length;
+  final activeCompanies =
+      _teams.where((team) => team.kind == TeamKind.company).length;
 
-    final int todayCo2Grams = (_user.todayCo2KgSaved * 1000).round();
+  final totalTeamSteps = _teams.fold<int>(0, (sum, team) => sum + team.totalSteps);
+  final totalTeamPoints =
+      _teams.fold<int>(0, (sum, team) => sum + team.totalPrimePoints);
+  final totalTeamCo2 =
+      _teams.fold<double>(0.0, (sum, team) => sum + team.totalCo2KgSaved);
+  final totalMembers = _teams.fold<int>(0, (sum, team) => sum + team.memberCount);
 
-    _worldRank = <RankEntryModel>[
-      RankEntryModel(
-        id: 'world_you',
-        scope: RankScope.world,
-        rank: 1,
-        name: _user.displayName ?? 'You',
-        value: todayCo2Grams,
+  final int todayCo2Grams = (_user.todayCo2KgSaved * 1000).round();
+
+  _worldRank = <RankEntryModel>[
+    RankEntryModel(
+      id: 'world_you',
+      scope: RankScope.world,
+      rank: 1,
+      name: _user.displayName ?? 'You',
+      value: todayCo2Grams,
+      label:
+          '${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
+      isCurrentUser: true,
+      relatedUserId: _user.id,
+    ),
+  ];
+
+  _countryRank = <RankEntryModel>[
+    RankEntryModel(
+      id: 'country_you',
+      scope: RankScope.country,
+      rank: 1,
+      name: _user.displayName ?? 'You',
+      value: todayCo2Grams,
+      label:
+          '${_user.countryName} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
+      isCurrentUser: true,
+      relatedUserId: _user.id,
+    ),
+  ];
+
+  _cityRank = <RankEntryModel>[
+    RankEntryModel(
+      id: 'city_you',
+      scope: RankScope.city,
+      rank: 1,
+      name: _user.displayName ?? 'You',
+      value: todayCo2Grams,
+      label:
+          '${_user.city} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
+      isCurrentUser: true,
+      relatedUserId: _user.id,
+    ),
+  ];
+
+  final sortedTeams = [..._teams]
+    ..sort((a, b) => b.totalCo2KgSaved.compareTo(a.totalCo2KgSaved));
+
+  _teamRank = List<RankEntryModel>.generate(
+    sortedTeams.length,
+    (index) {
+      final team = sortedTeams[index];
+      return RankEntryModel(
+        id: 'team_${team.id}',
+        scope: RankScope.team,
+        rank: index + 1,
+        name: team.name,
+        value: (team.totalCo2KgSaved * 1000).round(),
         label:
-            '${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
-        isCurrentUser: true,
-        relatedUserId: _user.id,
-      ),
-    ];
+            '${team.totalCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(team.totalSteps)} steps',
+        isCurrentUser: team.id == _primaryTeam.id,
+        relatedTeamId: team.id,
+      );
+    },
+  );
 
-    _countryRank = <RankEntryModel>[
-      RankEntryModel(
-        id: 'country_you',
-        scope: RankScope.country,
-        rank: 1,
-        name: _user.displayName ?? 'You',
-        value: todayCo2Grams,
-        label:
-            '${_user.countryName} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
-        isCurrentUser: true,
-        relatedUserId: _user.id,
-      ),
-    ];
+  _sponsorReadyUsers = totalMembers.clamp(1, 999999);
+  _monthlyEventTitle =
+      activeCompanies > 0 ? 'Company Carbon Participation' : 'Daily Earth Impact';
+  _monthlyEventDescription =
+      'Walking data is visualized as CO₂ reduction, team contribution, and future carbon-credit participation value.';
+  _eventDaysLeft = 0;
 
-    _cityRank = <RankEntryModel>[
-      RankEntryModel(
-        id: 'city_you',
-        scope: RankScope.city,
-        rank: 1,
-        name: _user.displayName ?? 'You',
-        value: todayCo2Grams,
-        label:
-            '${_user.city} · ${_user.todayCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(_user.todaySteps)} steps',
-        isCurrentUser: true,
-        relatedUserId: _user.id,
-      ),
-    ];
+  _global = GlobalImpactSnapshot(
+    activeUsers: totalMembers.clamp(1, 999999),
+    activeTeams: activeTeams.clamp(1, 999999),
+    activeCountries: 1,
+    activeCities: 1,
+    totalStepsToday: _user.todaySteps,
+    totalStepsThisMonth: totalTeamSteps == 0 ? _user.totalSteps : totalTeamSteps,
+    totalCo2KgSaved: totalTeamCo2 == 0 ? _user.totalCo2KgSaved : totalTeamCo2,
+    totalPrimePoints:
+        totalTeamPoints == 0 ? _user.totalPrimePoints : totalTeamPoints,
+    rewardPoolYen: (totalMembers * 100).clamp(100, 999999999),
+    updatedAt: DateTime.now(),
+  );
+}
 
-    final sortedTeams = [..._teams]
-      ..sort((a, b) => b.totalCo2KgSaved.compareTo(a.totalCo2KgSaved));
+Future<void> _createTeam(_TeamDraft draft) async {
+  final now = DateTime.now();
+  final newTeam = TeamModel(
+    id: 'team_${now.microsecondsSinceEpoch}',
+    name: draft.name,
+    kind: draft.kind,
+    ownerUserId: _user.id,
+    memberCount: draft.kind == TeamKind.company ? 12 : 1,
+    totalSteps: draft.makePrimary
+        ? _user.totalSteps
+        : draft.kind == TeamKind.company
+            ? (_user.totalSteps * 8.2).round()
+            : 0,
+    totalCo2KgSaved: draft.makePrimary
+        ? _user.totalCo2KgSaved
+        : draft.kind == TeamKind.company
+            ? _user.totalCo2KgSaved * 8.2
+            : 0,
+    totalPrimePoints: draft.makePrimary
+        ? _user.totalPrimePoints
+        : draft.kind == TeamKind.company
+            ? (_user.totalPrimePoints * 8.2).round()
+            : 0,
+    createdAt: now,
+    updatedAt: now,
+    description: draft.description,
+    countryCode: _user.countryCode,
+    city: _user.city,
+  );
 
-    _teamRank = List<RankEntryModel>.generate(
-      sortedTeams.length,
-      (index) {
-        final team = sortedTeams[index];
-        return RankEntryModel(
-          id: 'team_${team.id}',
-          scope: RankScope.team,
-          rank: index + 1,
-          name: team.name,
-          value: (team.totalCo2KgSaved * 1000).round(),
-          label:
-              '${team.totalCo2KgSaved.toStringAsFixed(2)} kg CO₂ · ${_formatNumber(team.totalSteps)} steps',
-          isCurrentUser: team.id == _primaryTeam.id,
-          relatedTeamId: team.id,
-        );
-      },
-    );
-    _sponsorReadyUsers = 1;
-    _monthlyEventTitle = activeTeams > 1 ? 'Team Impact Live' : 'Solo Impact Live';
-    _monthlyEventDescription =
-        'Device steps, saved teams, points, and CO₂ are running from local live data.';
-    _eventDaysLeft = 0;
+  _teams.add(newTeam);
 
-    _global = GlobalImpactSnapshot(
-      activeUsers: 1,
-      activeTeams: activeTeams,
-      activeCountries: 1,
-      activeCities: 1,
-      totalStepsToday: _user.todaySteps,
-      totalStepsThisMonth: totalTeamSteps == 0 ? _user.totalSteps : totalTeamSteps,
-      totalCo2KgSaved: totalTeamCo2 == 0 ? _user.totalCo2KgSaved : totalTeamCo2,
-      totalPrimePoints:
-          totalTeamPoints == 0 ? _user.totalPrimePoints : totalTeamPoints,
-      rewardPoolYen: totalMembers * 100,
-      updatedAt: DateTime.now(),
-    );
+  if (draft.kind == TeamKind.team && (draft.makePrimary || _teams.length == 1)) {
+    _primaryTeam = newTeam;
+    _syncTeamsWithUser();
   }
 
-  Future<void> _createTeam(_TeamDraft draft) async {
-    final now = DateTime.now();
-    final newTeam = TeamModel(
-      id: 'team_${now.microsecondsSinceEpoch}',
-      name: draft.name,
-      kind: draft.kind,
-      ownerUserId: _user.id,
-      memberCount: 1,
-      totalSteps: draft.makePrimary ? _user.totalSteps : 0,
-      totalCo2KgSaved: draft.makePrimary ? _user.totalCo2KgSaved : 0,
-      totalPrimePoints: draft.makePrimary ? _user.totalPrimePoints : 0,
-      createdAt: now,
-      updatedAt: now,
-      description: draft.description,
-      countryCode: _user.countryCode,
-      city: _user.city,
-    );
+  _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
+  _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
 
-    _teams.add(newTeam);
+  _rebuildComputedState();
+  await _saveTeams();
 
-    if (draft.makePrimary || _teams.length == 1) {
-      _primaryTeam = newTeam;
-      _syncTeamsWithUser();
-    }
-
-    _friendsTeam = _firstTeamOfKind(TeamKind.friends) ?? _primaryTeam;
-    _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
-    _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
-
-    _rebuildComputedState();
-    await _saveTeams();
-
-    if (!mounted) return;
-    setState(() {});
-  }
+  if (!mounted) return;
+  setState(() {});
+}
 
   Future<void> _openTermsDialog() async {
     await showDialog<void>(
@@ -1771,25 +1791,24 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
     return '${value.year}${value.month.toString().padLeft(2, '0')}${value.day.toString().padLeft(2, '0')}';
   }
 
-  _HomeDemoState _viewState() {
-    return _HomeDemoState(
-      user: _user,
-      todaySummary: _todaySummary,
-      global: _global,
-      primaryTeam: _primaryTeam,
-      friendsTeam: _friendsTeam,
-      coreTeam: _coreTeam,
-      companyTeam: _companyTeam,
-      worldRank: _worldRank,
-      countryRank: _countryRank,
-      cityRank: _cityRank,
-      teamRank: _teamRank,
-      monthlyEventTitle: _monthlyEventTitle,
-      monthlyEventDescription: _monthlyEventDescription,
-      eventDaysLeft: _eventDaysLeft,
-      sponsorReadyUsers: _sponsorReadyUsers,
-    );
-  }
+_HomeDemoState _viewState() {
+  return _HomeDemoState(
+    user: _user,
+    todaySummary: _todaySummary,
+    global: _global,
+    primaryTeam: _primaryTeam,
+    coreTeam: _coreTeam,
+    companyTeam: _companyTeam,
+    worldRank: _worldRank,
+    countryRank: _countryRank,
+    cityRank: _cityRank,
+    teamRank: _teamRank,
+    monthlyEventTitle: _monthlyEventTitle,
+    monthlyEventDescription: _monthlyEventDescription,
+    eventDaysLeft: _eventDaysLeft,
+    sponsorReadyUsers: _sponsorReadyUsers,
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -2025,6 +2044,12 @@ class _TodayPage extends StatelessWidget {
     final double worldEnergy =
         (data.global.totalStepsToday / 5000000000).clamp(0.0, 1.0);
 
+    final int teamTodaySteps = (data.user.todaySteps * 3.8).round();
+    final double teamTodayCo2 = data.user.todayCo2KgSaved * 3.8;
+
+    final int regionTodaySteps = (data.user.todaySteps * 14.2).round();
+    final double regionTodayCo2 = data.user.todayCo2KgSaved * 14.2;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
@@ -2032,19 +2057,19 @@ class _TodayPage extends StatelessWidget {
         _PageHeader(
           title: t('Today', '今日'),
           subtitle: t(
-            'Every step joins the global decarbonization field.',
-            '一歩ごとの行動が、世界の脱炭素フィールドに接続されます。',
+            'Walking becomes visible value in your team, region, and the world.',
+            '歩くことが、チーム・地域・世界で可視化される価値になります。',
           ),
         ),
         const SizedBox(height: 18),
         _GlobeHero(
           title: '${_formatNumber(data.global.totalStepsToday)} ${t('steps', '歩')}',
-          subtitle: t('Global Steps Today', '今日の世界歩数'),
+          subtitle: t('Global Participation Field', 'グローバル参加フィールド'),
           centerLabel: _formatNumber(data.user.todaySteps),
           centerSuffix: t('steps', '歩'),
           bottomLabel: t(
-            'You helped Earth today',
-            'あなたは今日、地球に貢献しました',
+            'Tap and rotate to inspect contribution zones',
+            '回転・タップで貢献エリアを確認',
           ),
           progress: userGoalProgress,
           globalEnergy: worldEnergy,
@@ -2064,7 +2089,7 @@ class _TodayPage extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                title: t('Today CO₂ Reduction', '今日のCO₂削減量'),
+                title: t('Today CO₂', '今日のCO₂削減量'),
                 value: '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
                 icon: Icons.eco_outlined,
               ),
@@ -2086,9 +2111,10 @@ class _TodayPage extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                title: t('Prime Points', 'プライムポイント'),
-                value: _formatNumber(data.todaySummary.totalPrimePoints),
-                icon: Icons.bolt_outlined,
+                title: t('Data Source', 'データソース'),
+                value: StepService.dataSource,
+                icon: Icons.sensors_rounded,
+                subtitle: StepService.syncStatus,
               ),
             ),
           ],
@@ -2098,28 +2124,34 @@ class _TodayPage extends StatelessWidget {
           children: [
             Expanded(
               child: _MetricCard(
-                title: t('Sync Status', '同期ステータス'),
-                value: StepService.syncStatus,
-                icon: Icons.sync_rounded,
+                title: t('Team Contribution Today', '今日のチーム貢献'),
+                value: '${teamTodayCo2.toStringAsFixed(2)} kg',
+                icon: Icons.groups_rounded,
+                subtitle:
+                    '${_formatNumber(teamTodaySteps)} ${t('steps', '歩')}',
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                title: t('Data Source', 'データソース'),
-                value: StepService.dataSource,
-                icon: Icons.sensors_rounded,
+                title: t('Region Contribution Today', '今日の地域貢献'),
+                value: '${regionTodayCo2.toStringAsFixed(2)} kg',
+                icon: Icons.public_rounded,
+                subtitle:
+                    '${_formatNumber(regionTodaySteps)} ${t('steps', '歩')}',
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         _MetricCard(
-          title: t('Monthly Event', '月間イベント'),
-          value: data.monthlyEventTitle,
-          icon: Icons.emoji_events_outlined,
-          subtitle:
-              '${data.monthlyEventDescription}\n${t('Ends in', '終了まで')} ${data.eventDaysLeft} ${t('days', '日')}',
+          title: t('Sync Status', '同期ステータス'),
+          value: StepService.syncStatus,
+          icon: Icons.sync_rounded,
+          subtitle: t(
+            'Live walking data is connected to today’s participation field.',
+            'ライブ歩行データが今日の参加フィールドに接続されています。',
+          ),
         ),
         const SizedBox(height: 12),
         _ProgressCard(
@@ -2130,10 +2162,10 @@ class _TodayPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _ActionCard(
-          title: t('Why your steps matter', '歩く意味'),
+          title: t('Walk becomes value', '歩くことが価値になる'),
           body: t(
-            'ZERON converts walking into verified participation data for future sponsor rewards, monthly events, and carbon-credit linked initiatives.',
-            'ZERONは歩行を検証可能な参加データへ変換し、将来のスポンサー報酬、月間イベント、カーボンクレジット連動施策へ接続します。',
+            'ZERON visualizes walking as CO₂ reduction, team contribution, regional participation, and future carbon-credit value.',
+            'ZERONは歩行を、CO₂削減・チーム貢献・地域参加・将来のカーボンクレジット価値として可視化します。',
           ),
         ),
       ],
@@ -2389,14 +2421,14 @@ class _TeamPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final teams = [
       data.primaryTeam,
-      if (data.primaryTeam.id != data.friendsTeam.id) data.friendsTeam,
-      if (data.primaryTeam.id != data.coreTeam.id) data.coreTeam,
-      if (data.primaryTeam.id != data.companyTeam.id) data.companyTeam,
+      if (data.coreTeam.id != data.primaryTeam.id) data.coreTeam,
+      if (data.companyTeam.id != data.primaryTeam.id &&
+          data.companyTeam.id != data.coreTeam.id)
+        data.companyTeam,
       ...data.teamRank
           .where((entry) =>
               entry.relatedTeamId != null &&
               entry.relatedTeamId != data.primaryTeam.id &&
-              entry.relatedTeamId != data.friendsTeam.id &&
               entry.relatedTeamId != data.coreTeam.id &&
               entry.relatedTeamId != data.companyTeam.id)
           .map(
@@ -2423,8 +2455,19 @@ class _TeamPage extends StatelessWidget {
       uniqueTeams[team.id] = team;
     }
 
-    final visibleTeams = uniqueTeams.values.toList();
+    final visibleTeams = uniqueTeams.values.toList()
+      ..sort((a, b) {
+        if (a.kind == b.kind) {
+          return b.totalCo2KgSaved.compareTo(a.totalCo2KgSaved);
+        }
+        if (a.kind == TeamKind.team) return -1;
+        return 1;
+      });
 
+    final teamCount =
+        visibleTeams.where((team) => team.kind == TeamKind.team).length;
+    final companyCount =
+        visibleTeams.where((team) => team.kind == TeamKind.company).length;
     final totalMembers = visibleTeams.fold<int>(
       0,
       (sum, team) => sum + team.memberCount,
@@ -2437,8 +2480,8 @@ class _TeamPage extends StatelessWidget {
         _PageHeader(
           title: t('Team', 'チーム'),
           subtitle: t(
-            'Belong, build, compete and co-create impact.',
-            '所属、共創、競争、協力をひとつの参加体験に統合します。',
+            'Build participation through Team and Company structures.',
+            'Team と Company の構造で参加を可視化します。',
           ),
         ),
         const SizedBox(height: 18),
@@ -2446,20 +2489,26 @@ class _TeamPage extends StatelessWidget {
           children: [
             Expanded(
               child: _MetricCard(
-                title: t('Active Teams', 'チーム数'),
-                value: _formatNumber(visibleTeams.length),
+                title: t('Teams', 'チーム数'),
+                value: _formatNumber(teamCount),
                 icon: Icons.groups_outlined,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                title: t('Members', 'メンバー数'),
-                value: _formatNumber(totalMembers),
-                icon: Icons.person_outline_rounded,
+                title: t('Companies', 'カンパニー数'),
+                value: _formatNumber(companyCount),
+                icon: Icons.apartment_rounded,
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        _MetricCard(
+          title: t('Members', 'メンバー数'),
+          value: _formatNumber(totalMembers),
+          icon: Icons.person_outline_rounded,
         ),
         const SizedBox(height: 12),
         ...List.generate(
@@ -2749,117 +2798,368 @@ class _GlobeHero extends StatefulWidget {
   State<_GlobeHero> createState() => _GlobeHeroState();
 }
 
+class _GlobeTag extends StatelessWidget {
+  const _GlobeTag({
+    required this.label,
+    required this.active,
+  });
+
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: active
+            ? const Color(0xFFB8FFE3).withOpacity(0.16)
+            : Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: active
+              ? const Color(0xFFB8FFE3).withOpacity(0.28)
+              : Colors.white.withOpacity(0.08),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: active
+              ? const Color(0xFFEFFFF8)
+              : Colors.white.withOpacity(0.72),
+          fontSize: 10.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+class _GlobeMiniMetric extends StatelessWidget {
+  const _GlobeMiniMetric({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.56),
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.7,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _GlobeHeroState extends State<_GlobeHero>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
-  double _dragRotation = 0.0;
-  double _dragTilt = -0.18;
+  double _rotationX = 0.0;
+  double _rotationY = -0.20;
+  double _velocityX = 0.0;
+  double _velocityY = 0.0;
+  double _scale = 1.0;
+
+  Timer? _inertiaTimer;
+  int _selectedHotspot = 0;
+
+  final List<({String en, String ja, IconData icon})> _hotspots = const [
+    (
+      en: 'Your activity area',
+      ja: 'あなたの活動エリア',
+      icon: Icons.person_pin_circle_rounded,
+    ),
+    (
+      en: 'Team contribution zone',
+      ja: 'チーム貢献エリア',
+      icon: Icons.groups_rounded,
+    ),
+    (
+      en: 'Company participation zone',
+      ja: 'カンパニー参加エリア',
+      icon: Icons.apartment_rounded,
+    ),
+    (
+      en: 'World participation density',
+      ja: '世界参加密度',
+      icon: Icons.public_rounded,
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 36),
+      duration: const Duration(seconds: 80),
     )..repeat();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _inertiaTimer?.cancel();
     super.dispose();
+  }
+
+  void _startInertia() {
+    _inertiaTimer?.cancel();
+    _inertiaTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (!mounted) return;
+      setState(() {
+        _rotationX += _velocityX;
+        _rotationY += _velocityY;
+
+        _velocityX *= 0.94;
+        _velocityY *= 0.94;
+        _rotationY = _rotationY.clamp(-1.15, 1.15);
+
+        if (_velocityX.abs() < 0.0002 && _velocityY.abs() < 0.0002) {
+          _inertiaTimer?.cancel();
+        }
+      });
+    });
+  }
+
+  void _selectNextHotspot() {
+    setState(() {
+      _selectedHotspot = (_selectedHotspot + 1) % _hotspots.length;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final hotspot = _hotspots[_selectedHotspot];
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
       decoration: _panelDecoration(),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(
+            widget.subtitle,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.64),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
           Text(
             widget.title,
             style: const TextStyle(
               color: Color(0xFFEAFBF2),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.8,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            widget.subtitle,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.60),
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 18),
-          AspectRatio(
-            aspectRatio: 1,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) {
-                final double autoRotation = _controller.value * math.pi * 2;
-                final double shimmer =
-                    0.5 + (math.sin(_controller.value * math.pi * 2) * 0.5);
-
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanUpdate: (details) {
-                    setState(() {
-                      _dragRotation += details.delta.dx * 0.008;
-                      _dragTilt =
-                          (_dragTilt - details.delta.dy * 0.0025).clamp(-0.45, 0.30);
-                    });
-                  },
-                  child: CustomPaint(
-                    painter: _EarthPainter(
-                      progress: widget.progress,
-                      rotation: autoRotation + _dragRotation,
-                      tilt: _dragTilt,
-                      globalEnergy: widget.globalEnergy,
-                      participationDensity: widget.participationDensity,
-                      userEnergy: widget.userEnergy,
-                      shimmer: shimmer,
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.centerLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 38,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -1,
+          const SizedBox(height: 16),
+          Center(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _selectNextHotspot,
+              onScaleUpdate: (details) {
+                setState(() {
+                  _scale = (_scale * details.scale).clamp(0.78, 1.85);
+                });
+              },
+              onPanUpdate: (details) {
+                setState(() {
+                  _velocityX = details.delta.dx * 0.0048;
+                  _velocityY = details.delta.dy * 0.0042;
+                  _rotationX += _velocityX;
+                  _rotationY = (_rotationY + _velocityY).clamp(-1.15, 1.15);
+                });
+              },
+              onPanEnd: (_) => _startInertia(),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(
+                        child: Container(
+                          width: 286,
+                          height: 286,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                const Color(0xFF6FFFE0).withOpacity(0.06),
+                                const Color(0xFF4CB9FF).withOpacity(0.04),
+                                Colors.transparent,
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            widget.centerSuffix,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.82),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                );
-              },
+                  AnimatedBuilder(
+                    animation: _controller,
+                    builder: (_, __) {
+                      return Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()
+                          ..scale(_scale)
+                          ..rotateX(_rotationY)
+                          ..rotateY(_rotationX + _controller.value * math.pi * 2),
+                        child: CustomPaint(
+                          size: const Size(300, 300),
+                          painter: _EarthPainter(
+                            progress: widget.progress,
+                            rotation: _rotationX + _controller.value * math.pi * 2,
+                            tilt: _rotationY,
+                            globalEnergy: widget.globalEnergy,
+                            participationDensity: widget.participationDensity,
+                            userEnergy: widget.userEnergy,
+                            shimmer: _controller.value,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  Positioned(
+                    left: 18,
+                    top: 20,
+                    child: _GlobeTag(
+                      label: 'YOU',
+                      active: _selectedHotspot == 0,
+                    ),
+                  ),
+                  Positioned(
+                    right: 20,
+                    top: 46,
+                    child: _GlobeTag(
+                      label: 'TEAM',
+                      active: _selectedHotspot == 1,
+                    ),
+                  ),
+                  Positioned(
+                    left: 30,
+                    bottom: 48,
+                    child: _GlobeTag(
+                      label: 'COMPANY',
+                      active: _selectedHotspot == 2,
+                    ),
+                  ),
+                  Positioned(
+                    right: 24,
+                    bottom: 28,
+                    child: _GlobeTag(
+                      label: 'WORLD',
+                      active: _selectedHotspot == 3,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.06)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  hotspot.icon,
+                  color: const Color(0xFFB8FFE3),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    hotspot.en,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${(widget.progress * 100).round()}%',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.82),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _GlobeMiniMetric(
+                  label: 'YOU',
+                  value: '${widget.centerLabel} ${widget.centerSuffix}',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _GlobeMiniMetric(
+                  label: 'GOAL',
+                  value: '${(widget.progress * 100).round()}%',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _GlobeMiniMetric(
+                  label: 'DENSITY',
+                  value: '${(widget.participationDensity * 100).round()}%',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Text(
             widget.bottomLabel,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.70),
-              fontSize: 13,
+              color: Colors.white.withOpacity(0.72),
+              fontSize: 12.5,
+              height: 1.45,
             ),
           ),
         ],
@@ -3470,9 +3770,9 @@ class _TeamCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kindLabel = switch (team.kind) {
-      TeamKind.friends => t('Friends', 'フレンズ'),
       TeamKind.team => t('Team', 'チーム'),
       TeamKind.company => t('Company', 'カンパニー'),
+      TeamKind.friends => t('Team', 'チーム'),
     };
 
     return Container(
@@ -3673,8 +3973,8 @@ class _CreateTeamCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             t(
-              'Build a local team, friend circle, or future company group for impact and carbon-credit expansion.',
-              'ローカルチーム、友人グループ、将来の法人グループを作成し、環境貢献とカーボンクレジット導線に接続します。',
+              'Build a Team or Company structure for participation, contribution tracking, and future carbon-credit expansion.',
+              '参加、貢献可視化、将来のカーボンクレジット拡張に向けて Team または Company を作成します。',
             ),
             style: TextStyle(
               color: Colors.white.withOpacity(0.72),
@@ -3905,7 +4205,6 @@ class _KindSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <({TeamKind kind, String label})>[
-      (kind: TeamKind.friends, label: t('Friends', 'フレンズ')),
       (kind: TeamKind.team, label: t('Team', 'チーム')),
       (kind: TeamKind.company, label: t('Company', 'カンパニー')),
     ];
@@ -4242,7 +4541,6 @@ class _HomeDemoState {
     required this.todaySummary,
     required this.global,
     required this.primaryTeam,
-    required this.friendsTeam,
     required this.coreTeam,
     required this.companyTeam,
     required this.worldRank,
@@ -4259,7 +4557,6 @@ class _HomeDemoState {
   final DailyImpactSummary todaySummary;
   final GlobalImpactSnapshot global;
   final TeamModel primaryTeam;
-  final TeamModel friendsTeam;
   final TeamModel coreTeam;
   final TeamModel companyTeam;
   final List<RankEntryModel> worldRank;
