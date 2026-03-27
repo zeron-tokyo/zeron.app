@@ -1231,20 +1231,20 @@ class _ZeronMainShellState extends State<_ZeronMainShell> {
   bool _soundOn = true;
   bool _notificationsOn = true;
 
-late ZeronUser _user;
-late DailyImpactSummary _todaySummary;
-late GlobalImpactSnapshot _global;
-late TeamModel _primaryTeam;
-late TeamModel _coreTeam;
-late TeamModel _companyTeam;
-late List<RankEntryModel> _worldRank;
-late List<RankEntryModel> _countryRank;
-late List<RankEntryModel> _cityRank;
-late List<RankEntryModel> _teamRank;
-late String _monthlyEventTitle;
-late String _monthlyEventDescription;
-late int _eventDaysLeft;
-late int _sponsorReadyUsers;
+  late ZeronUser _user;
+  late DailyImpactSummary _todaySummary;
+  late GlobalImpactSnapshot _global;
+  late TeamModel _primaryTeam;
+  late TeamModel _coreTeam;
+  late TeamModel _companyTeam;
+  late List<RankEntryModel> _worldRank;
+  late List<RankEntryModel> _countryRank;
+  late List<RankEntryModel> _cityRank;
+  late List<RankEntryModel> _teamRank;
+  late String _monthlyEventTitle;
+  late String _monthlyEventDescription;
+  late int _eventDaysLeft;
+  late int _sponsorReadyUsers;
 
   final List<TeamModel> _teams = <TeamModel>[];
 
@@ -1329,7 +1329,7 @@ late int _sponsorReadyUsers;
     });
   }
 
-Future<void> _loadRuntimeState() async {
+  Future<void> _loadRuntimeState() async {
   final prefs = await SharedPreferences.getInstance();
   final now = DateTime.now();
   final todayKey = _dateKey(now);
@@ -1454,14 +1454,14 @@ Future<void> _loadRuntimeState() async {
   _rebuildComputedState();
 }
 
-TeamModel? _firstTeamOfKind(TeamKind kind) {
+  TeamModel? _firstTeamOfKind(TeamKind kind) {
   for (final team in _teams) {
     if (team.kind == kind) return team;
   }
   return null;
 }
 
-List<TeamModel> _loadTeamsFromPrefs(SharedPreferences prefs, DateTime now) {
+  List<TeamModel> _loadTeamsFromPrefs(SharedPreferences prefs, DateTime now) {
   final raw = prefs.getStringList(_persistTeamsKey) ?? <String>[];
   return raw
       .map((item) {
@@ -1496,18 +1496,14 @@ List<TeamModel> _loadTeamsFromPrefs(SharedPreferences prefs, DateTime now) {
       .toList();
 }
 
-Future<void> _saveTeams() async {
+  Future<void> _saveTeams() async {
   final prefs = await SharedPreferences.getInstance();
   final payload = _teams
       .map(
         (team) => [
           team.id,
           team.name,
-          switch (team.kind) {
-            TeamKind.team => 'team',
-            TeamKind.company => 'company',
-            TeamKind.friends => 'team',
-          },
+          team.kind == TeamKind.company ? 'company' : 'team',
           '${team.memberCount}',
           '${team.totalSteps}',
           '${team.totalCo2KgSaved}',
@@ -1577,7 +1573,7 @@ Future<void> _saveTeams() async {
     });
   }
 
-void _syncTeamsWithUser() {
+  void _syncTeamsWithUser() {
   for (int i = 0; i < _teams.length; i++) {
     final team = _teams[i];
     if (team.id == _primaryTeam.id) {
@@ -1605,7 +1601,7 @@ void _syncTeamsWithUser() {
   _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
 }
 
-void _rebuildComputedState() {
+  void _rebuildComputedState() {
   final activeTeams = _teams.where((team) => team.kind == TeamKind.team).length;
   final activeCompanies =
       _teams.where((team) => team.kind == TeamKind.company).length;
@@ -1704,52 +1700,52 @@ void _rebuildComputedState() {
   );
 }
 
-Future<void> _createTeam(_TeamDraft draft) async {
-  final now = DateTime.now();
-  final newTeam = TeamModel(
-    id: 'team_${now.microsecondsSinceEpoch}',
-    name: draft.name,
-    kind: draft.kind,
-    ownerUserId: _user.id,
-    memberCount: draft.kind == TeamKind.company ? 12 : 1,
-    totalSteps: draft.makePrimary
-        ? _user.totalSteps
-        : draft.kind == TeamKind.company
-            ? (_user.totalSteps * 8.2).round()
-            : 0,
-    totalCo2KgSaved: draft.makePrimary
-        ? _user.totalCo2KgSaved
-        : draft.kind == TeamKind.company
-            ? _user.totalCo2KgSaved * 8.2
-            : 0,
-    totalPrimePoints: draft.makePrimary
-        ? _user.totalPrimePoints
-        : draft.kind == TeamKind.company
-            ? (_user.totalPrimePoints * 8.2).round()
-            : 0,
-    createdAt: now,
-    updatedAt: now,
-    description: draft.description,
-    countryCode: _user.countryCode,
-    city: _user.city,
-  );
+  Future<void> _createTeam(_TeamDraft draft) async {
+    final now = DateTime.now();
+    final newTeam = TeamModel(
+      id: 'team_${now.microsecondsSinceEpoch}',
+      name: draft.name,
+      kind: draft.kind,
+      ownerUserId: _user.id,
+      memberCount: draft.kind == TeamKind.company ? 12 : 1,
+      totalSteps: draft.makePrimary
+          ? _user.totalSteps
+          : draft.kind == TeamKind.company
+              ? (_user.totalSteps * 8.2).round()
+              : 0,
+      totalCo2KgSaved: draft.makePrimary
+          ? _user.totalCo2KgSaved
+          : draft.kind == TeamKind.company
+              ? _user.totalCo2KgSaved * 8.2
+              : 0,
+      totalPrimePoints: draft.makePrimary
+          ? _user.totalPrimePoints
+          : draft.kind == TeamKind.company
+              ? (_user.totalPrimePoints * 8.2).round()
+              : 0,
+      createdAt: now,
+      updatedAt: now,
+      description: draft.description,
+      countryCode: _user.countryCode,
+      city: _user.city,
+    );
 
-  _teams.add(newTeam);
+    _teams.add(newTeam);
 
-  if (draft.kind == TeamKind.team && (draft.makePrimary || _teams.length == 1)) {
-    _primaryTeam = newTeam;
-    _syncTeamsWithUser();
+    if (draft.kind == TeamKind.team && (draft.makePrimary || _teams.length == 1)) {
+      _primaryTeam = newTeam;
+      _syncTeamsWithUser();
+    }
+
+    _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
+    _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
+
+    _rebuildComputedState();
+    await _saveTeams();
+
+    if (!mounted) return;
+    setState(() {});
   }
-
-  _coreTeam = _firstTeamOfKind(TeamKind.team) ?? _primaryTeam;
-  _companyTeam = _firstTeamOfKind(TeamKind.company) ?? _primaryTeam;
-
-  _rebuildComputedState();
-  await _saveTeams();
-
-  if (!mounted) return;
-  setState(() {});
-}
 
   Future<void> _openTermsDialog() async {
     await showDialog<void>(
@@ -1791,24 +1787,24 @@ Future<void> _createTeam(_TeamDraft draft) async {
     return '${value.year}${value.month.toString().padLeft(2, '0')}${value.day.toString().padLeft(2, '0')}';
   }
 
-_HomeDemoState _viewState() {
-  return _HomeDemoState(
-    user: _user,
-    todaySummary: _todaySummary,
-    global: _global,
-    primaryTeam: _primaryTeam,
-    coreTeam: _coreTeam,
-    companyTeam: _companyTeam,
-    worldRank: _worldRank,
-    countryRank: _countryRank,
-    cityRank: _cityRank,
-    teamRank: _teamRank,
-    monthlyEventTitle: _monthlyEventTitle,
-    monthlyEventDescription: _monthlyEventDescription,
-    eventDaysLeft: _eventDaysLeft,
-    sponsorReadyUsers: _sponsorReadyUsers,
-  );
-}
+  _HomeDemoState _viewState() {
+    return _HomeDemoState(
+      user: _user,
+      todaySummary: _todaySummary,
+      global: _global,
+      primaryTeam: _primaryTeam,
+      coreTeam: _coreTeam,
+      companyTeam: _companyTeam,
+      worldRank: _worldRank,
+      countryRank: _countryRank,
+      cityRank: _cityRank,
+      teamRank: _teamRank,
+      monthlyEventTitle: _monthlyEventTitle,
+      monthlyEventDescription: _monthlyEventDescription,
+      eventDaysLeft: _eventDaysLeft,
+      sponsorReadyUsers: _sponsorReadyUsers,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2184,6 +2180,10 @@ class _DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final int projectedWeeklySteps = data.todaySummary.totalSteps * 7;
+    final double projectedWeeklyCo2 = data.todaySummary.totalCo2KgSaved * 7;
+    final int projectedWeeklyPoints = data.todaySummary.totalPrimePoints * 7;
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
       children: [
@@ -2226,44 +2226,43 @@ class _DashboardPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _SectionCard(
-          title: t('This Week', '今週'),
+          title: t('Weekly Projection', '週間予測'),
           child: Column(
             children: [
               _SignalRow(
-                label: t('Steps', '歩数'),
-                value: _formatNumber(data.todaySummary.totalSteps * 7),
+                label: t('Projected Steps', '予測歩数'),
+                value: _formatNumber(projectedWeeklySteps),
               ),
               const SizedBox(height: 10),
               _SignalRow(
-                label: t('CO₂ Reduction', 'CO₂削減量'),
-                value:
-                    '${(data.todaySummary.totalCo2KgSaved * 7).toStringAsFixed(2)} kg',
+                label: t('Projected CO₂', '予測CO₂削減量'),
+                value: '${projectedWeeklyCo2.toStringAsFixed(2)} kg',
               ),
               const SizedBox(height: 10),
               _SignalRow(
-                label: t('Prime Points', 'プライムポイント'),
-                value: _formatNumber(data.todaySummary.totalPrimePoints * 7),
+                label: t('Projected Points', '予測ポイント'),
+                value: _formatNumber(projectedWeeklyPoints),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         _SectionCard(
-          title: t('This Month', '今月'),
+          title: t('Total Participation', '累積参加量'),
           child: Column(
             children: [
               _SignalRow(
-                label: t('Steps', '歩数'),
+                label: t('Total Steps', '累積歩数'),
                 value: _formatNumber(data.user.totalSteps),
               ),
               const SizedBox(height: 10),
               _SignalRow(
-                label: t('CO₂ Reduction', 'CO₂削減量'),
+                label: t('Total CO₂ Reduction', '累積CO₂削減量'),
                 value: '${data.user.totalCo2KgSaved.toStringAsFixed(2)} kg',
               ),
               const SizedBox(height: 10),
               _SignalRow(
-                label: t('Prime Points', 'プライムポイント'),
+                label: t('Total Prime Points', '累積プライムポイント'),
                 value: _formatNumber(data.user.totalPrimePoints),
               ),
             ],
@@ -2575,8 +2574,8 @@ class _AccountPage extends StatelessWidget {
         _PageHeader(
           title: t('Account', 'アカウント'),
           subtitle: t(
-            'Identity, permissions, legal status and membership.',
-            'プロフィール、法務、設定、サブスクリプション管理。',
+            'Profile, device sync, language, team status, legal, and support.',
+            'プロフィール、端末同期、言語、チーム状況、法務、サポートを管理します。',
           ),
         ),
         const SizedBox(height: 18),
@@ -2584,6 +2583,11 @@ class _AccountPage extends StatelessWidget {
           title: t('Profile', 'プロフィール'),
           child: Column(
             children: [
+              _AccountRow(
+                label: t('Name', '名前'),
+                value: data.user.displayName ?? '',
+              ),
+              const SizedBox(height: 14),
               _AccountRow(label: 'Email', value: data.user.email),
               const SizedBox(height: 14),
               _AccountRow(
@@ -2605,64 +2609,67 @@ class _AccountPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _SectionCard(
-          title: t('Subscription', 'サブスクリプション'),
+          title: t('Device & Sync', '端末と同期'),
+          child: Column(
+            children: [
+              _AccountRow(
+                label: t('Data Source', 'データソース'),
+                value: StepService.dataSource,
+              ),
+              const SizedBox(height: 14),
+              _AccountRow(
+                label: t('Sync Status', '同期ステータス'),
+                value: StepService.syncStatus,
+              ),
+              const SizedBox(height: 14),
+              _AccountRow(
+                label: t('Today Steps', '今日の歩数'),
+                value: _formatNumber(data.todaySummary.totalSteps),
+              ),
+              const SizedBox(height: 14),
+              _AccountRow(
+                label: t('Today CO₂', '今日のCO₂削減量'),
+                value: '${data.todaySummary.totalCo2KgSaved.toStringAsFixed(2)} kg',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _SectionCard(
+          title: t('Language', '言語'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                t(
-                  'Unlock advanced ranking analytics, event boosts, sponsor campaign priority and future reward acceleration.',
-                  '高度なランキング分析、イベントブースト、スポンサーキャンペーン優先参加、将来の報酬加速を解放します。',
-                ),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.74),
-                  fontSize: 13,
-                  height: 1.5,
-                ),
+              _LanguageSelector(
+                selected: language,
+                onChanged: onSetLanguage,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _SectionCard(
+          title: t('Team', 'チーム'),
+          child: Column(
+            children: [
+              _AccountRow(
+                label: t('Primary Team', 'メインチーム'),
+                value: data.primaryTeam.name,
               ),
               const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFB8FFE3).withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFB8FFE3).withOpacity(0.18),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.workspace_premium_outlined,
-                      color: Color(0xFFB8FFE3),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        t(
-                          'Subscription ready for sponsor and reward expansion',
-                          'スポンサー連動と報酬拡張に対応するサブスク準備済み',
-                        ),
-                        style: const TextStyle(
-                          color: Color(0xFFEFFFF8),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '¥980/mo',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.90),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+              _AccountRow(
+                label: t('Company', 'カンパニー'),
+                value: data.companyTeam.name,
+              ),
+              const SizedBox(height: 14),
+              _AccountRow(
+                label: t('Team CO₂', 'チームCO₂'),
+                value: '${data.primaryTeam.totalCo2KgSaved.toStringAsFixed(2)} kg',
+              ),
+              const SizedBox(height: 14),
+              _AccountRow(
+                label: t('Company CO₂', 'カンパニーCO₂'),
+                value: '${data.companyTeam.totalCo2KgSaved.toStringAsFixed(2)} kg',
               ),
             ],
           ),
@@ -2688,7 +2695,7 @@ class _AccountPage extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               _SimpleArrowRow(
-                label: t('Commercial Law', '特定商取引法表記'),
+                label: t('Specified Commercial Transactions Act', '特定商取引法表記'),
                 onTap: onOpenCommercialLaw,
               ),
             ],
@@ -2696,34 +2703,24 @@ class _AccountPage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _SectionCard(
-          title: t('Settings', '設定'),
+          title: t('Support', 'サポート'),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                t('Language', '言語'),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.70),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+              _AccountRow(
+                label: t('Support Email', 'サポートメール'),
+                value: 'support@zeron.tokyo',
               ),
-              const SizedBox(height: 12),
-              _LanguageSelector(
-                selected: language,
-                onChanged: onSetLanguage,
-              ),
-              const SizedBox(height: 18),
-              _ToggleRow(
-                label: t('Sound', '音'),
-                value: soundOn,
-                onChanged: onSetSound,
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               _ToggleRow(
                 label: t('Notifications', '通知'),
                 value: notificationsOn,
                 onChanged: onSetNotifications,
+              ),
+              const SizedBox(height: 12),
+              _ToggleRow(
+                label: t('Sound', '音'),
+                value: soundOn,
+                onChanged: onSetSound,
               ),
             ],
           ),
@@ -3769,12 +3766,10 @@ class _TeamCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final kindLabel = switch (team.kind) {
-      TeamKind.team => t('Team', 'チーム'),
-      TeamKind.company => t('Company', 'カンパニー'),
-      TeamKind.friends => t('Team', 'チーム'),
-    };
-
+    final kindLabel = team.kind == TeamKind.company
+        ? t('Company', 'カンパニー')
+        : t('Team', 'チーム');
+    
     return Container(
       decoration: _panelDecoration(highlighted: isPrimary),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -4024,6 +4019,120 @@ class _CreateTeamDialog extends StatefulWidget {
   State<_CreateTeamDialog> createState() => _CreateTeamDialogState();
 }
 
+class _TypeGuideCard extends StatelessWidget {
+  const _TypeGuideCard({
+    required this.title,
+    required this.body,
+    required this.icon,
+  });
+
+  final String title;
+  final String body;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFB8FFE3).withOpacity(0.12),
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFFB8FFE3),
+              size: 19,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  body,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.68),
+                    fontSize: 12.5,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFB8FFE3).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFB8FFE3).withOpacity(0.16),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: const Color(0xFFB8FFE3),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.76),
+                fontSize: 12.5,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CreateTeamDialogState extends State<_CreateTeamDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _descriptionController;
@@ -4052,10 +4161,12 @@ class _CreateTeamDialogState extends State<_CreateTeamDialog> {
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(widget.t(
-            'Please enter a team name.',
-            'チーム名を入力してください。',
-          )),
+          content: Text(
+            widget.t(
+              'Please enter a team name.',
+              'チーム名を入力してください。',
+            ),
+          ),
         ),
       );
       return;
@@ -4073,6 +4184,8 @@ class _CreateTeamDialogState extends State<_CreateTeamDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isCompany = _kind == TeamKind.company;
+
     return Dialog(
       backgroundColor: const Color(0xFF091015),
       shape: RoundedRectangleBorder(
@@ -4093,10 +4206,56 @@ class _CreateTeamDialogState extends State<_CreateTeamDialog> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                widget.t(
+                  'Create a Team for personal or group participation, or create a Company structure for larger-scale carbon participation.',
+                  '個人や小規模グループ参加のための Team、または大きな脱炭素参加構造のための Company を作成します。',
+                ),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.70),
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _KindSelector(
+                selected: _kind,
+                t: widget.t,
+                onChanged: (value) {
+                  setState(() {
+                    _kind = value;
+                    if (_kind == TeamKind.company) {
+                      _makePrimary = false;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 14),
+              _TypeGuideCard(
+                title: isCompany
+                    ? widget.t('Company Structure', 'Company構造')
+                    : widget.t('Team Structure', 'Team構造'),
+                body: isCompany
+                    ? widget.t(
+                        'Use Company for organization-level participation, internal contribution tracking, and future carbon reporting.',
+                        'Company は組織単位の参加、社内貢献の可視化、将来のカーボンレポーティングに使います。',
+                      )
+                    : widget.t(
+                        'Use Team for your main walking unit, local group participation, and direct daily contribution tracking.',
+                        'Team は日々の歩行参加の主軸、ローカルなグループ参加、直接的な日次貢献可視化に使います。',
+                      ),
+                icon: isCompany
+                    ? Icons.apartment_rounded
+                    : Icons.groups_rounded,
+              ),
               const SizedBox(height: 14),
               _FormField(
                 controller: _nameController,
-                label: widget.t('Team name', 'チーム名'),
+                label: isCompany
+                    ? widget.t('Company name', 'カンパニー名')
+                    : widget.t('Team name', 'チーム名'),
               ),
               const SizedBox(height: 12),
               _FormField(
@@ -4104,60 +4263,59 @@ class _CreateTeamDialogState extends State<_CreateTeamDialog> {
                 label: widget.t('Description', '説明'),
               ),
               const SizedBox(height: 14),
-              _KindSelector(
-                selected: _kind,
-                t: widget.t,
-                onChanged: (value) {
-                  setState(() {
-                    _kind = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 14),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+              if (!isCompany)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.06)),
+                  ),
+                  child: CheckboxListTile(
+                    value: _makePrimary,
+                    activeColor: const Color(0xFFB8FFE3),
+                    checkColor: Colors.black,
+                    side: BorderSide(color: Colors.white.withOpacity(0.20)),
+                    title: Text(
+                      widget.t(
+                        'Make this my primary team',
+                        'このチームをメインチームにする',
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      widget.t(
+                        'Your live steps and CO₂ totals will attach to this team.',
+                        'ライブ歩数とCO₂累計をこのチームに紐付けます。',
+                      ),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.64),
+                        fontSize: 12,
+                      ),
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _makePrimary = value ?? false;
+                      });
+                    },
+                  ),
                 ),
-                child: CheckboxListTile(
-                  value: _makePrimary,
-                  activeColor: const Color(0xFFB8FFE3),
-                  checkColor: Colors.black,
-                  side: BorderSide(color: Colors.white.withOpacity(0.20)),
-                  title: Text(
-                    widget.t(
-                      'Make this my primary team',
-                      'このチームをメインチームにする',
-                    ),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+              if (isCompany)
+                _InfoPill(
+                  icon: Icons.info_outline_rounded,
+                  text: widget.t(
+                    'Company structures are created as organization layers and are not used as your primary walking team.',
+                    'Company は組織レイヤーとして作成され、メイン歩行チームにはなりません。',
                   ),
-                  subtitle: Text(
-                    widget.t(
-                      'Your live steps and CO₂ totals will attach to this team.',
-                      'ライブ歩数とCO₂累計をこのチームに紐付けます。',
-                    ),
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.64),
-                      fontSize: 12,
-                    ),
-                  ),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _makePrimary = value ?? false;
-                    });
-                  },
                 ),
-              ),
               const SizedBox(height: 18),
               SizedBox(
                 width: double.infinity,
@@ -4175,7 +4333,9 @@ class _CreateTeamDialogState extends State<_CreateTeamDialog> {
                   ),
                   onPressed: _submit,
                   child: Text(
-                    widget.t('Create', '作成'),
+                    isCompany
+                        ? widget.t('Create Company', 'Companyを作成')
+                        : widget.t('Create Team', 'Teamを作成'),
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
