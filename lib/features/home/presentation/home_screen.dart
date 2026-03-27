@@ -5086,9 +5086,7 @@ String _planLabel(ZeronPlan plan) {
       return 'Free';
     case ZeronPlan.plus:
       return 'Plus';
-    case ZeronPlan.pro:
-      return 'Pro';
-    case ZeronPlan.enterprise:
-      return 'Enterprise';
+    case ZeronPlan.sponsor:
+      return 'Sponsor';
   }
 }
