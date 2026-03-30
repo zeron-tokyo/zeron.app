@@ -1168,20 +1168,30 @@ const _LocalizedDocument _termsDocument = _LocalizedDocument(
 These Terms of Service govern access to ZERON and related participation features.
 
 1. Users may create an account and participate in walking-based environmental initiatives.
+
 2. Users must provide accurate registration information.
+
 3. Fraudulent step activity, identity abuse, or system exploitation may result in suspension.
+
 4. Future rewards, campaigns, and sponsor programs may have additional rules.
+
 5. ZERON may update features, policies, and service details to improve platform operations.
+
 6. Continued use of the service constitutes agreement to the latest terms.
 ''',
   bodyJa: '''
 本利用規約は、ZERONおよび関連する参加機能へのアクセスと利用条件を定めるものです。
 
 1. ユーザーはアカウントを作成し、歩行ベースの環境参加施策に参加できます。
+
 2. ユーザーは正確な登録情報を提供しなければなりません。
+
 3. 不正な歩数操作、なりすまし、システム悪用が確認された場合、利用停止となることがあります。
+
 4. 将来の報酬、キャンペーン、スポンサー施策には追加ルールが適用される場合があります。
+
 5. ZERONはサービス改善のため、機能・方針・提供内容を更新する場合があります。
+
 6. 継続利用した場合、最新の利用規約に同意したものとみなします。
 ''',
 );
