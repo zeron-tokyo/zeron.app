@@ -726,7 +726,7 @@ class _FormField extends StatelessWidget {
   }
 }
 
-class _OpeningAccountSheet extends StatelessWidget {
+class _OpeningAccountSheet extends StatefulWidget {
   const _OpeningAccountSheet({
     required this.language,
     required this.username,
@@ -751,7 +751,28 @@ class _OpeningAccountSheet extends StatelessWidget {
   final Future<void> Function() onOpenTerms;
   final Future<void> Function() onOpenPrivacy;
 
-  bool get _isJa => language == 'ja';
+  @override
+  State<_OpeningAccountSheet> createState() => _OpeningAccountSheetState();
+}
+
+class _OpeningAccountSheetState extends State<_OpeningAccountSheet> {
+  late String _language;
+
+  @override
+  void initState() {
+    super.initState();
+    _language = widget.language;
+  }
+
+  bool get _isJa => _language == 'ja';
+
+  Future<void> _handleLanguageChanged(String value) async {
+    if (_language == value) return;
+    setState(() {
+      _language = value;
+    });
+    await widget.onSetLanguage(value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -787,34 +808,38 @@ class _OpeningAccountSheet extends StatelessWidget {
                   ),
                 ),
                 _CompactLanguageSwitch(
-                  selected: language,
-                  onChanged: onSetLanguage,
+                  selected: _language,
+                  onChanged: _handleLanguageChanged,
                 ),
               ],
             ),
             const SizedBox(height: 18),
             _SettingsRow(
               label: _isJa ? 'アカウント情報' : 'Account Information',
-              value: username.isEmpty ? (_isJa ? '未登録' : 'Not registered') : username,
-              onTap: onOpenAccountInfo,
+              value: widget.username.isEmpty
+                  ? (_isJa ? '未登録' : 'Not registered')
+                  : widget.username,
+              onTap: widget.onOpenAccountInfo,
             ),
             const SizedBox(height: 10),
             _SettingsRow(
               label: _isJa ? '特定商取引法表記' : 'Specified Commercial Transactions Act',
-              onTap: onOpenCommercialLaw,
+              onTap: widget.onOpenCommercialLaw,
             ),
             const SizedBox(height: 10),
             _SettingsRow(
               label: _isJa ? '利用規約' : 'Terms of Service',
-              onTap: onOpenTerms,
+              onTap: widget.onOpenTerms,
             ),
             const SizedBox(height: 10),
             _SettingsRow(
               label: _isJa ? 'プライバシーポリシー' : 'Privacy Policy',
-              onTap: onOpenPrivacy,
+              onTap: widget.onOpenPrivacy,
             ),
             const SizedBox(height: 10),
-            if (email.isNotEmpty || country.isNotEmpty || region.isNotEmpty)
+            if (widget.email.isNotEmpty ||
+                widget.country.isNotEmpty ||
+                widget.region.isNotEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -825,9 +850,9 @@ class _OpeningAccountSheet extends StatelessWidget {
                 ),
                 child: Text(
                   [
-                    if (email.isNotEmpty) email,
-                    if (country.isNotEmpty) country,
-                    if (region.isNotEmpty) region,
+                    if (widget.email.isNotEmpty) widget.email,
+                    if (widget.country.isNotEmpty) widget.country,
+                    if (widget.region.isNotEmpty) widget.region,
                   ].join(' · '),
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.68),
@@ -3393,13 +3418,14 @@ class _GlobeHeroState extends State<_GlobeHero>
                       return Transform(
                         alignment: Alignment.center,
                         transform: Matrix4.identity()
+                          ..setEntry(3, 2, 0.0018)
                           ..scale(_baseScale)
                           ..rotateX(_rotationY)
                           ..rotateY(
                             _rotationX + _controller.value * math.pi * 2,
                           ),
                         child: CustomPaint(
-                          size: const Size(300, 300),
+                          size: const Size(320, 320),
                           painter: _EarthPainter(
                             progress: widget.progress,
                             rotation:
@@ -5378,155 +5404,157 @@ class _SharePreviewSheet extends StatelessWidget {
 
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Share Preview',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _ShareStoryPreview(
-              payload: payload,
-              languageJa: _isJa,
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.06)),
-              ),
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.78),
-                  fontSize: 13,
-                  height: 1.55,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.08),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: text));
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              _isJa
-                                  ? 'シェアテキストをコピーしました。'
-                                  : 'Share text copied.',
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    child: Text(
-                      _isJa ? 'テキストをコピー' : 'Copy text',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Share Preview',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor:
-                          const Color(0xFFB8FFE3).withOpacity(0.14),
-                      foregroundColor: const Color(0xFFEFFFF8),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(
-                          color: const Color(0xFFB8FFE3).withOpacity(0.22),
+              ),
+              const SizedBox(height: 16),
+              _ShareStoryPreview(
+                payload: payload,
+                languageJa: _isJa,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                ),
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.78),
+                    fontSize: 13,
+                    height: 1.55,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.08),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: text));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                _isJa
+                                    ? 'シェアテキストをコピーしました。'
+                                    : 'Share text copied.',
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                      child: Text(
+                        _isJa ? 'テキストをコピー' : 'Copy text',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                    onPressed: () async {
-                      try {
-                        final png = await _captureShareCardPng(
-                          context: context,
-                          payload: payload,
-                          languageJa: _isJa,
-                        );
-                        await Clipboard.setData(
-                          ClipboardData(text: text),
-                        );
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                _isJa
-                                    ? '画像生成準備が完了しました。テキストもコピー済みです。'
-                                    : 'Story card prepared. Text copied too.',
-                              ),
-                            ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor:
+                            const Color(0xFFB8FFE3).withOpacity(0.14),
+                        foregroundColor: const Color(0xFFEFFFF8),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(
+                            color: const Color(0xFFB8FFE3).withOpacity(0.22),
+                          ),
+                        ),
+                      ),
+                      onPressed: () async {
+                        try {
+                          final png = await _captureShareCardPng(
+                            context: context,
+                            payload: payload,
+                            languageJa: _isJa,
                           );
-                        }
-                        if (png.isEmpty) {
-                          throw Exception('PNG empty');
-                        }
-                      } catch (_) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                _isJa
-                                    ? 'プレビュー画像の生成に失敗しました。'
-                                    : 'Failed to generate story preview.',
-                              ),
-                            ),
+                          await Clipboard.setData(
+                            ClipboardData(text: text),
                           );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  _isJa
+                                      ? '画像生成準備が完了しました。テキストもコピー済みです。'
+                                      : 'Story card prepared. Text copied too.',
+                                ),
+                              ),
+                            );
+                          }
+                          if (png.isEmpty) {
+                            throw Exception('PNG empty');
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  _isJa
+                                      ? 'プレビュー画像の生成に失敗しました。'
+                                      : 'Failed to generate story preview.',
+                                ),
+                              ),
+                            );
+                          }
                         }
-                      }
-                    },
-                    child: Text(
-                      _isJa ? '画像を生成' : 'Generate image',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                      },
+                      child: Text(
+                        _isJa ? '画像を生成' : 'Generate image',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -5784,7 +5812,7 @@ class _EarthPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
-    final radius = size.shortestSide * 0.34;
+    final radius = size.shortestSide * 0.44;
 
     final rect = Rect.fromCircle(center: center, radius: radius);
 
