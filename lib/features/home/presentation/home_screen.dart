@@ -13,6 +13,7 @@ import 'package:zeron/widgets/zeron_distortion.dart';
 import 'package:zeron/widgets/zeron_glow.dart';
 import 'package:zeron/widgets/zeron_logo.dart';
 import 'package:zeron/widgets/zeron_noise.dart';
+import 'package:zeron/widgets/earth/zeron_globe.dart';
 
 class ZeronHomeScreen extends StatefulWidget {
   const ZeronHomeScreen({super.key});
@@ -3269,18 +3270,7 @@ class _GlobeMiniMetric extends StatelessWidget {
   }
 }
 
-class _GlobeHeroState extends State<_GlobeHero>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  double _rotationX = 0.0;
-  double _rotationY = -0.20;
-  double _velocityX = 0.0;
-  double _velocityY = 0.0;
-  double _baseScale = 1.0;
-  double _gestureStartScale = 1.0;
-
-  Timer? _inertiaTimer;
+class _GlobeHeroState extends State<_GlobeHero> {
   int _selectedHotspot = 0;
 
   final List<({String en, String ja, IconData icon})> _hotspots = const [
@@ -3305,47 +3295,6 @@ class _GlobeHeroState extends State<_GlobeHero>
       icon: Icons.public_rounded,
     ),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 80),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _inertiaTimer?.cancel();
-    super.dispose();
-  }
-
-  void _startInertia() {
-    _inertiaTimer?.cancel();
-    _inertiaTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
-      if (!mounted) return;
-      setState(() {
-        _rotationX += _velocityX;
-        _rotationY += _velocityY;
-
-        _velocityX *= 0.94;
-        _velocityY *= 0.94;
-        _rotationY = _rotationY.clamp(-1.15, 1.15);
-
-        if (_velocityX.abs() < 0.0002 && _velocityY.abs() < 0.0002) {
-          _inertiaTimer?.cancel();
-        }
-      });
-    });
-  }
-
-  void _selectNextHotspot() {
-    setState(() {
-      _selectedHotspot = (_selectedHotspot + 1) % _hotspots.length;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -3378,112 +3327,76 @@ class _GlobeHeroState extends State<_GlobeHero>
           ),
           const SizedBox(height: 16),
           Center(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _selectNextHotspot,
-              onScaleStart: (_) {
-                _gestureStartScale = _baseScale;
-              },
-              onScaleUpdate: (details) {
-                setState(() {
-                  if (details.pointerCount > 1) {
-                    _baseScale =
-                        (_gestureStartScale * details.scale).clamp(0.78, 1.85);
-                  } else {
-                    _velocityX = details.focalPointDelta.dx * 0.0048;
-                    _velocityY = details.focalPointDelta.dy * 0.0042;
-                    _rotationX += _velocityX;
-                    _rotationY =
-                        (_rotationY + _velocityY).clamp(-1.15, 1.15);
-                  }
-                });
-              },
-              onScaleEnd: (_) => _startInertia(),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Center(
-                        child: Container(
-                          width: 286,
-                          height: 286,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                const Color(0xFF6FFFE0).withOpacity(0.06),
-                                const Color(0xFF4CB9FF).withOpacity(0.04),
-                                Colors.transparent,
-                              ],
-                            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        width: 286,
+                        height: 286,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              const Color(0xFF6FFFE0).withOpacity(0.06),
+                              const Color(0xFF4CB9FF).withOpacity(0.04),
+                              Colors.transparent,
+                            ],
                           ),
                         ),
                       ),
                     ),
                   ),
-                  AnimatedBuilder(
-                    animation: _controller,
-                    builder: (_, __) {
-                      return Transform(
-                        alignment: Alignment.center,
-                        transform: Matrix4.identity()
-                          ..setEntry(3, 2, 0.0018)
-                          ..scale(_baseScale)
-                          ..rotateX(_rotationY)
-                          ..rotateY(
-                            _rotationX + _controller.value * math.pi * 2,
-                          ),
-                        child: CustomPaint(
-                          size: const Size(320, 320),
-                          painter: _EarthPainter(
-                            progress: widget.progress,
-                            rotation:
-                                _rotationX + _controller.value * math.pi * 2,
-                            tilt: _rotationY,
-                            globalEnergy: widget.globalEnergy,
-                            participationDensity: widget.participationDensity,
-                            userEnergy: widget.userEnergy,
-                            shimmer: _controller.value,
-                          ),
-                        ),
-                      );
-                    },
+                ),
+                ZeronGlobe(
+                  size: 320,
+                  progress: widget.progress,
+                  globalEnergy: widget.globalEnergy,
+                  participationDensity: widget.participationDensity,
+                  userEnergy: widget.userEnergy,
+                  languageJa: widget.languageJa,
+                  onHotspotChanged: (index) {
+                    if (!mounted) return;
+                    setState(() {
+                      _selectedHotspot = index;
+                    });
+                  },
+                ),
+                Positioned(
+                  left: 18,
+                  top: 20,
+                  child: _GlobeTag(
+                    label: 'YOU',
+                    active: _selectedHotspot == 0,
                   ),
-                  Positioned(
-                    left: 18,
-                    top: 20,
-                    child: _GlobeTag(
-                      label: 'YOU',
-                      active: _selectedHotspot == 0,
-                    ),
+                ),
+                Positioned(
+                  right: 20,
+                  top: 46,
+                  child: _GlobeTag(
+                    label: 'TEAM',
+                    active: _selectedHotspot == 1,
                   ),
-                  Positioned(
-                    right: 20,
-                    top: 46,
-                    child: _GlobeTag(
-                      label: 'TEAM',
-                      active: _selectedHotspot == 1,
-                    ),
+                ),
+                Positioned(
+                  left: 30,
+                  bottom: 48,
+                  child: _GlobeTag(
+                    label: 'COMPANY',
+                    active: _selectedHotspot == 2,
                   ),
-                  Positioned(
-                    left: 30,
-                    bottom: 48,
-                    child: _GlobeTag(
-                      label: 'COMPANY',
-                      active: _selectedHotspot == 2,
-                    ),
+                ),
+                Positioned(
+                  right: 24,
+                  bottom: 28,
+                  child: _GlobeTag(
+                    label: 'WORLD',
+                    active: _selectedHotspot == 3,
                   ),
-                  Positioned(
-                    right: 24,
-                    bottom: 28,
-                    child: _GlobeTag(
-                      label: 'WORLD',
-                      active: _selectedHotspot == 3,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 14),
